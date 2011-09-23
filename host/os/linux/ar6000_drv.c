@@ -1048,12 +1048,10 @@ ar6000_softmac_update(AR_SOFTC_T *ar, A_UCHAR *eeprom_data, size_t eeprom_size)
         ptr_mac = (A_UINT8 *)((A_UCHAR *)eeprom_data + AR6003_MAC_ADDRESS_OFFSET);
         break;
     default:
-        AR_DEBUG_PRINTF(ATH_DEBUG_ERR,("Invalid Target Type \n"));
+	AR_DEBUG_PRINTF(ATH_DEBUG_ERR, ("Invalid Target Type\n"));
         return;
     }
-    printk("MAC from EEPROM %02X:%02X:%02X:%02X:%02X:%02X\n", 
-            ptr_mac[0], ptr_mac[1], ptr_mac[2], 
-            ptr_mac[3], ptr_mac[4], ptr_mac[5]); 
+	printk(KERN_DEBUG "MAC from EEPROM %pM\n", ptr_mac);
 
     /* create a random MAC in case we cannot read file from system */
     ptr_mac[0] = 0;
@@ -1082,9 +1080,7 @@ ar6000_softmac_update(AR_SOFTC_T *ar, A_UCHAR *eeprom_data, size_t eeprom_size)
         }
         A_RELEASE_FIRMWARE(softmac_entry);
     }
-    printk("MAC from %s %02X:%02X:%02X:%02X:%02X:%02X\n", source,
-            ptr_mac[0], ptr_mac[1], ptr_mac[2], 
-            ptr_mac[3], ptr_mac[4], ptr_mac[5]); 
+	printk(KERN_DEBUG "MAC from %s %pM\n", source, ptr_mac);
    calculate_crc(ar->arTargetType, eeprom_data, eeprom_size);
 }
 #endif /* SOFTMAC_FILE_USED */
@@ -1745,6 +1741,15 @@ ar6000_avail_ev(void *context, void *hif_handle)
     struct wireless_dev *wdev;
 #endif /* ATH6K_CONFIG_CFG80211 */
     A_STATUS init_status = A_OK;
+    HIF_DEVICE_OS_DEVICE_INFO osDevInfo;
+
+    A_MEMZERO(&osDevInfo, sizeof(osDevInfo));
+    if ( A_FAILED( HIFConfigureDevice(hif_handle, HIF_DEVICE_GET_OS_DEVICE,
+                    &osDevInfo, sizeof(osDevInfo))) )
+    {
+        AR_DEBUG_PRINTF(ATH_DEBUG_ERR,("%s: Failed to get OS device instance\n", __func__));
+        return A_ERROR;
+    }
 
     AR_DEBUG_PRINTF(ATH_DEBUG_INFO,("ar6000_available\n"));
 
@@ -1764,7 +1769,8 @@ ar6000_avail_ev(void *context, void *hif_handle)
     device_index = i;
 
 #ifdef ATH6K_CONFIG_CFG80211
-    wdev = ar6k_cfg80211_init(NULL);
+    wdev = ar6k_cfg80211_init(osDevInfo.pOSDevice);
+
     if (IS_ERR(wdev)) {
         AR_DEBUG_PRINTF(ATH_DEBUG_ERR, ("%s: ar6k_cfg80211_init failed\n", __func__));
         return A_ERROR;
@@ -1809,12 +1815,7 @@ ar6000_avail_ev(void *context, void *hif_handle)
 
 #ifdef SET_NETDEV_DEV
     if (ar_netif) { 
-        HIF_DEVICE_OS_DEVICE_INFO osDevInfo;
-        A_MEMZERO(&osDevInfo, sizeof(osDevInfo));
-        if ( A_SUCCESS( HIFConfigureDevice(hif_handle, HIF_DEVICE_GET_OS_DEVICE,
-                        &osDevInfo, sizeof(osDevInfo))) ) {
-            SET_NETDEV_DEV(dev, osDevInfo.pOSDevice);
-        }
+        SET_NETDEV_DEV(dev, osDevInfo.pOSDevice);
     }
 #endif 
 
@@ -1899,6 +1900,9 @@ ar6000_avail_ev(void *context, void *hif_handle)
 
     spin_lock_init(&ar->arLock);
 
+#ifdef WAPI_ENABLE
+    ar->arWapiEnable = 0;
+#endif
 
 
 #ifdef CONFIG_CHECKSUM_OFFLOAD
@@ -4561,8 +4565,6 @@ ar6000_ready_event(void *devt, A_UINT8 *datap, A_UINT8 phyCap, A_UINT32 sw_ver, 
     AR_SOFTC_T *ar = (AR_SOFTC_T *)devt;
     struct net_device *dev = ar->arNetDev;
 
-    ar->arWmiReady = TRUE;
-    wake_up(&arEvent);
     A_MEMCPY(dev->dev_addr, datap, AR6000_ETH_ADDR_LEN);
     AR_DEBUG_PRINTF(ATH_DEBUG_INFO,("mac address = %2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x\n",
         dev->dev_addr[0], dev->dev_addr[1],
@@ -4573,6 +4575,9 @@ ar6000_ready_event(void *devt, A_UINT8 *datap, A_UINT8 phyCap, A_UINT32 sw_ver, 
     ar->arVersion.wlan_ver = sw_ver;
     ar->arVersion.abi_ver = abi_ver;
 
+    /* Indicate to the waiting thread that the ready event was received */
+    ar->arWmiReady = TRUE;
+    wake_up(&arEvent);
 }
 
 void
@@ -4621,6 +4626,11 @@ ar6000_connect_event(AR_SOFTC_T *ar, A_UINT16 channel, A_UINT8 *bssid,
                 if(ar->arPairwiseCrypto == WEP_CRYPT) {
                     ar6000_install_static_wep_keys(ar);
                 }
+#ifdef WAPI_ENABLE
+                else if(ar->arPairwiseCrypto == WAPI_CRYPT) {
+                    ap_set_wapi_key(ar, ik);
+                }
+#endif
                 break;
             case WPA_PSK_AUTH:
             case WPA2_PSK_AUTH:
@@ -4682,6 +4692,11 @@ skip_key:
             case WEP_CRYPT:
                 A_PRINTF("Cipher: WEP\n");
                 break;
+#ifdef WAPI_ENABLE
+            case WAPI_CRYPT:
+                A_PRINTF("Cipher: WAPI\n");
+                break;
+#endif
             default:
                 A_PRINTF("Cipher: NONE\n");
                 break;
@@ -5456,13 +5471,13 @@ ar6000_hbChallengeResp_event(AR_SOFTC_T *ar, A_UINT32 cookie, A_UINT32 source)
 void
 ar6000_reportError_event(AR_SOFTC_T *ar, WMI_TARGET_ERROR_VAL errorVal)
 {
-    char    *errString[] = {
-                [WMI_TARGET_PM_ERR_FAIL]    "WMI_TARGET_PM_ERR_FAIL",
-                [WMI_TARGET_KEY_NOT_FOUND]  "WMI_TARGET_KEY_NOT_FOUND",
-                [WMI_TARGET_DECRYPTION_ERR] "WMI_TARGET_DECRYPTION_ERR",
-                [WMI_TARGET_BMISS]          "WMI_TARGET_BMISS",
-                [WMI_PSDISABLE_NODE_JOIN]   "WMI_PSDISABLE_NODE_JOIN"
-                };
+	static const char * const errString[] = {
+		[WMI_TARGET_PM_ERR_FAIL]    "WMI_TARGET_PM_ERR_FAIL",
+		[WMI_TARGET_KEY_NOT_FOUND]  "WMI_TARGET_KEY_NOT_FOUND",
+		[WMI_TARGET_DECRYPTION_ERR] "WMI_TARGET_DECRYPTION_ERR",
+		[WMI_TARGET_BMISS]          "WMI_TARGET_BMISS",
+		[WMI_PSDISABLE_NODE_JOIN]   "WMI_PSDISABLE_NODE_JOIN"
+	};
 
     A_PRINTF("AR6000 Error on Target. Error = 0x%x\n", errorVal);
 
@@ -6323,6 +6338,25 @@ rssi_compensation_reverse_calc(AR_SOFTC_T *ar, A_INT16 rssi, A_BOOL Above)
     return rssi;
 }
 
+#ifdef WAPI_ENABLE
+void ap_wapi_rekey_event(AR_SOFTC_T *ar, A_UINT8 type, A_UINT8 *mac)
+{
+    union iwreq_data wrqu;
+    A_CHAR buf[20];
+
+    A_MEMZERO(buf, sizeof(buf));
+
+    strcpy(buf, "WAPI_REKEY");
+    buf[10] = type;
+    A_MEMCPY(&buf[11], mac, ATH_MAC_LEN);
+
+    A_MEMZERO(&wrqu, sizeof(wrqu));
+    wrqu.data.length = 10+1+ATH_MAC_LEN;
+    wireless_send_event(ar->arNetDev, IWEVCUSTOM, &wrqu, buf);
+
+    A_PRINTF("WAPI REKEY - %d - %02x:%02x\n", type, mac[4], mac[5]);
+}
+#endif
 
 #ifdef USER_KEYS
 static A_STATUS
@@ -6424,6 +6458,9 @@ ar6000_ap_mode_profile_commit(struct ar6_softc *ar)
     switch(ar->arAuthMode) {
     case NONE_AUTH:
         if((ar->arPairwiseCrypto != NONE_CRYPT) &&
+#ifdef WAPI_ENABLE
+           (ar->arPairwiseCrypto != WAPI_CRYPT) &&
+#endif
            (ar->arPairwiseCrypto != WEP_CRYPT)) {
             A_PRINTF("Cipher not supported in AP mode Open auth\n");
             return -EOPNOTSUPP;
@@ -6484,6 +6521,16 @@ ar6000_connect_to_ap(struct ar6_softc *ar)
                 return -EIO;
             }
         }
+#ifdef WAPI_ENABLE
+        if (ar->arWapiEnable)  {
+            ar->arPairwiseCrypto = WAPI_CRYPT;
+            ar->arPairwiseCryptoLen = 0;
+            ar->arGroupCrypto = WAPI_CRYPT;
+            ar->arGroupCryptoLen = 0;
+            ar->arAuthMode = NONE_AUTH;
+            ar->arConnectCtrlFlags |= CONNECT_IGNORE_WPAx_GROUP_CIPHER;
+        }
+#endif
         AR_DEBUG_PRINTF(ATH_DEBUG_WLAN_CONNECT,("Connect called with authmode %d dot11 auth %d"\
                         " PW crypto %d PW crypto Len %d GRP crypto %d"\
                         " GRP crypto Len %d\n",
@@ -6585,6 +6632,34 @@ is_xioctl_allowed(A_UINT8 mode, int cmd)
     return A_ERROR;
 }
 
+#ifdef WAPI_ENABLE
+int
+ap_set_wapi_key(struct ar6_softc *ar, void *ikey)
+{
+    struct ieee80211req_key *ik = (struct ieee80211req_key *)ikey;
+    KEY_USAGE   keyUsage = 0;
+    A_STATUS    status;
+
+    if (A_MEMCMP(ik->ik_macaddr, bcast_mac, IEEE80211_ADDR_LEN) == 0) {
+        keyUsage = GROUP_USAGE;
+    } else {
+        keyUsage = PAIRWISE_USAGE;
+    }
+    A_PRINTF("WAPI_KEY: Type:%d ix:%d mac:%02x:%02x len:%d\n",
+        keyUsage, ik->ik_keyix, ik->ik_macaddr[4], ik->ik_macaddr[5],
+        ik->ik_keylen);
+
+    status = wmi_addKey_cmd(ar->arWmi, ik->ik_keyix, WAPI_CRYPT, keyUsage,
+                            ik->ik_keylen, (A_UINT8 *)&ik->ik_keyrsc,
+                            ik->ik_keydata, KEY_OP_INIT_VAL, ik->ik_macaddr,
+                            SYNC_BOTH_WMIFLAG);
+
+    if (A_OK != status) {
+        return -EIO;
+    }
+    return 0;
+}
+#endif
 
 void ar6000_peer_event(
     void *context,

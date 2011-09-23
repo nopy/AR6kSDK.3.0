@@ -3453,6 +3453,11 @@ main (int argc, char **argv)
                     case WEP_CRYPT:
                         str = "WEP";
                         break;
+#ifdef WAPI_ENABLE
+                    case WAPI_CRYPT:
+                        str = "WAPI";
+                        break;
+#endif
                     default:
                         str = "NONE";
                         break;

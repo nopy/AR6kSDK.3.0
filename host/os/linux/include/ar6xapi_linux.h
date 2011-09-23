@@ -161,6 +161,10 @@ void ar6000_aggr_rcv_addba_resp_evt(struct ar6_softc *ar, WMI_ADDBA_RESP_EVENT *
 void ar6000_aggr_rcv_delba_req_evt(struct ar6_softc *ar, WMI_DELBA_EVENT *cmd);
 void ar6000_hci_event_rcv_evt(struct ar6_softc *ar, WMI_HCI_EVENT *cmd);
 
+#ifdef WAPI_ENABLE
+int ap_set_wapi_key(struct ar6_softc *ar, void *ik);
+void ap_wapi_rekey_event(struct ar6_softc *ar, A_UINT8 type, A_UINT8 *mac);
+#endif
 
 A_STATUS ar6000_connect_to_ap(struct ar6_softc *ar);
 A_STATUS ar6000_disconnect(struct ar6_softc *ar);

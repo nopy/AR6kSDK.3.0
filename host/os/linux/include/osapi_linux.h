@@ -42,6 +42,7 @@
 #include <asm/irq.h>
 #endif
 
+#include <linux/semaphore.h>
 #include <linux/cache.h>
 
 #ifdef __GNUC__

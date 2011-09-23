@@ -893,7 +893,7 @@ ar6000_update_wlan_pwr_state(struct ar6_softc *ar, AR6000_WLAN_STATE state, A_BO
                                         (!ar->arBTSharing || btOff));
             if ((suspendCutPwr) ||
                 (suspendCutIfBtOff) ||
-                (ar->arWlanState==WLAN_POWER_STATE_CUT_PWR))
+                ((int)ar->arWlanState==(int)WLAN_POWER_STATE_CUT_PWR))
             {
                 powerState = WLAN_POWER_STATE_CUT_PWR;
             }
@@ -973,18 +973,6 @@ ar6000_set_wlan_state(struct ar6_softc *ar, AR6000_WLAN_STATE state)
     }
     ar->arWlanOff = off;
     status = ar6000_update_wlan_pwr_state(ar, state, FALSE);
-#ifdef ANDROID_ENV
-    if (status==A_OK) {
-        /* Send wireless event which need by android supplicant */
-        union iwreq_data wrqu;
-        const char *eventStr = (state==WLAN_ENABLED) ? "START" : "STOP";
-        char eventBuf[32];
-        strcpy(eventBuf, eventStr);
-        A_MEMZERO(&wrqu, sizeof(wrqu));
-        wrqu.data.length = strlen(eventBuf);
-        wireless_send_event(ar->arNetDev, IWEVCUSTOM, &wrqu, eventBuf);
-    }
-#endif
     return status;
 }
 

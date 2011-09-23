@@ -20,32 +20,15 @@
 #ifndef _AR6000_H_
 #define _AR6000_H_
 
-#include <linux/version.h>
-
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,17)
-#include <linux/config.h>
-#elif LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33)
-#include <linux/autoconf.h>
-#else
-#include <generated/autoconf.h>
-#endif
+//#include <linux/autoconf.h>
 #include <linux/init.h>
-#include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/spinlock.h>
-#include <linux/skbuff.h>
 #include <linux/if_ether.h>
-#include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <net/iw_handler.h>
 #include <linux/if_arp.h>
 #include <linux/ip.h>
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,26)
-#include <asm/semaphore.h>
-#else
-#include <linux/semaphore.h>
-#endif
 #include <linux/wireless.h>
 #ifdef ATH6K_CONFIG_CFG80211
 #include <net/cfg80211.h>
@@ -606,6 +589,9 @@ typedef struct ar6_softc {
     A_BOOL                  bIsDestroyProgress; /* flag to indicate ar6k destroy is in progress */
     A_TIMER                 disconnect_timer;
     A_UINT8		    rxMetaVersion;
+#ifdef WAPI_ENABLE
+    A_UINT8                 arWapiEnable;
+#endif
 	WMI_BTCOEX_CONFIG_EVENT arBtcoexConfig;
 	WMI_BTCOEX_STATS_EVENT  arBtcoexStats;
     A_INT32                 (*exitCallback)(void *config);  /* generic callback at AR6K exit */

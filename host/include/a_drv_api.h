@@ -70,6 +70,10 @@ extern "C" {
 #define A_WMI_DTIMEXPIRY_EVENT(devt)\
     ar6000_dtimexpiry_event((devt))
 
+#ifdef WAPI_ENABLE
+#define A_WMI_WAPI_REKEY_EVENT(devt, type, mac)\
+    ap_wapi_rekey_event((devt),(type),(mac))
+#endif
 
 #define A_WMI_REGDOMAIN_EVENT(devt, regCode)    \
     ar6000_regDomain_event((devt), (regCode))

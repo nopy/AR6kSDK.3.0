@@ -1577,6 +1577,20 @@ ar6000_ioctl_ap_setparam(AR_SOFTC_T *ar, int param, int value)
                 ar->arGroupCryptoLen     = 0;
             }
             break;
+#ifdef WAPI_ENABLE
+        case IEEE80211_PARAM_WAPI:
+            A_PRINTF("WAPI Policy: %d\n", value);
+            ar->arDot11AuthMode      = OPEN_AUTH;
+            ar->arAuthMode           = NONE_AUTH;
+            if(value & 0x1) {
+                ar->arPairwiseCrypto     = WAPI_CRYPT;
+                ar->arGroupCrypto        = WAPI_CRYPT;
+            } else {
+                ar->arPairwiseCrypto     = NONE_CRYPT;
+                ar->arGroupCrypto        = NONE_CRYPT;
+            }
+            break;
+#endif
     }
     return ret;
 }
@@ -1733,6 +1747,11 @@ ar6000_ioctl_setkey(AR_SOFTC_T *ar, struct ieee80211req_key *ik)
         if(ar->arNextMode == AP_NETWORK) {
             A_MEMCPY(&ar->ap_mode_bkey, ik,
                      sizeof(struct ieee80211req_key));
+#ifdef WAPI_ENABLE
+            if(ar->arPairwiseCrypto == WAPI_CRYPT) {
+                return ap_set_wapi_key(ar, ik);
+            }
+#endif
         }
 #ifdef USER_KEYS
         A_MEMCPY(&ar->user_saved_keys.bcast_ik, ik,
@@ -1743,6 +1762,13 @@ ar6000_ioctl_setkey(AR_SOFTC_T *ar, struct ieee80211req_key *ik)
 #ifdef USER_KEYS
         A_MEMCPY(&ar->user_saved_keys.ucast_ik, ik,
                  sizeof(struct ieee80211req_key));
+#endif
+#ifdef WAPI_ENABLE
+        if(ar->arNextMode == AP_NETWORK) {
+            if(ar->arPairwiseCrypto == WAPI_CRYPT) {
+                return ap_set_wapi_key(ar, ik);
+            }
+        }
 #endif
     }
 
@@ -1844,7 +1870,10 @@ int ar6000_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
          * the first word of the parameter block, and use the command
          * AR6000_IOCTL_EXTENDED_CMD on the ioctl call.
          */
-        get_user(cmd, (int *)rq->ifr_data);
+	if (get_user(cmd, (int *)rq->ifr_data)) {
+	    ret = -EFAULT;
+	    goto ioctl_done;
+	}
         userdata = (char *)(((unsigned int *)rq->ifr_data)+1);
         if(is_xioctl_allowed(ar->arNextMode, cmd) != A_OK) {
             A_PRINTF("xioctl: cmd=%d not allowed in this mode\n",cmd);
@@ -2064,8 +2093,12 @@ int ar6000_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
             break;
 
         case AR6000_XIOCTL_BMI_READ_MEMORY:
-            get_user(address, (unsigned int *)userdata);
-            get_user(length, (unsigned int *)userdata + 1);
+	     if (get_user(address, (unsigned int *)userdata) ||
+		get_user(length, (unsigned int *)userdata + 1)) {
+		ret = -EFAULT;
+		break;
+	    }
+
             AR_DEBUG_PRINTF(ATH_DEBUG_INFO,("Read Memory (address: 0x%x, length: %d)\n",
                              address, length));
             if ((buffer = (unsigned char *)A_MALLOC(length)) != NULL) {
@@ -2081,8 +2114,11 @@ int ar6000_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
             break;
 
         case AR6000_XIOCTL_BMI_WRITE_MEMORY:
-            get_user(address, (unsigned int *)userdata);
-            get_user(length, (unsigned int *)userdata + 1);
+	     if (get_user(address, (unsigned int *)userdata) ||
+		get_user(length, (unsigned int *)userdata + 1)) {
+		ret = -EFAULT;
+		break;
+	    }
             AR_DEBUG_PRINTF(ATH_DEBUG_INFO,("Write Memory (address: 0x%x, length: %d)\n",
                              address, length));
             if ((buffer = (unsigned char *)A_MALLOC(length)) != NULL) {
@@ -2106,29 +2142,49 @@ int ar6000_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
            break;
 
         case AR6000_XIOCTL_BMI_EXECUTE:
-            get_user(address, (unsigned int *)userdata);
-            get_user(param, (unsigned int *)userdata + 1);
+	     if (get_user(address, (unsigned int *)userdata) ||
+		get_user(param, (unsigned int *)userdata + 1)) {
+		ret = -EFAULT;
+		break;
+	    }
             AR_DEBUG_PRINTF(ATH_DEBUG_INFO,("Execute (address: 0x%x, param: %d)\n",
                              address, param));
             ret = BMIExecute(hifDevice, address, (A_UINT32*)&param);
-            put_user(param, (unsigned int *)rq->ifr_data); /* return value */
+	    /* return value */
+	    if (put_user(param, (unsigned int *)rq->ifr_data)) {
+		ret = -EFAULT;
+		break;
+	    }
             break;
 
         case AR6000_XIOCTL_BMI_SET_APP_START:
-            get_user(address, (unsigned int *)userdata);
+	    if (get_user(address, (unsigned int *)userdata)) {
+		ret = -EFAULT;
+		break;
+	    }
             AR_DEBUG_PRINTF(ATH_DEBUG_INFO,("Set App Start (address: 0x%x)\n", address));
             ret = BMISetAppStart(hifDevice, address);
             break;
 
         case AR6000_XIOCTL_BMI_READ_SOC_REGISTER:
-            get_user(address, (unsigned int *)userdata);
+	    if (get_user(address, (unsigned int *)userdata)) {
+		ret = -EFAULT;
+		break;
+	    }
             ret = BMIReadSOCRegister(hifDevice, address, (A_UINT32*)&param);
-            put_user(param, (unsigned int *)rq->ifr_data); /* return value */
+	    /* return value */
+	    if (put_user(param, (unsigned int *)rq->ifr_data)) {
+		ret = -EFAULT;
+		break;
+	    }
             break;
 
         case AR6000_XIOCTL_BMI_WRITE_SOC_REGISTER:
-            get_user(address, (unsigned int *)userdata);
-            get_user(param, (unsigned int *)userdata + 1);
+	    if (get_user(address, (unsigned int *)userdata) ||
+		get_user(param, (unsigned int *)userdata + 1)) {
+		ret = -EFAULT;
+		break;
+	    }
             ret = BMIWriteSOCRegister(hifDevice, address, param);
             break;
 
@@ -2166,12 +2222,18 @@ int ar6000_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
         case AR6000_XIOCTL_HTC_RAW_READ:
             if (arRawIfEnabled(ar)) {
                 unsigned int streamID;
-                get_user(streamID, (unsigned int *)userdata);
-                get_user(length, (unsigned int *)userdata + 1);
+		if (get_user(streamID, (unsigned int *)userdata) ||
+		    get_user(length, (unsigned int *)userdata + 1)) {
+		    ret = -EFAULT;
+		    break;
+		}
                 buffer = (unsigned char*)rq->ifr_data + sizeof(length);
                 ret = ar6000_htc_raw_read(ar, (HTC_RAW_STREAM_ID)streamID,
                                           (char*)buffer, length);
-                put_user(ret, (unsigned int *)rq->ifr_data);
+		if (put_user(ret, (unsigned int *)rq->ifr_data)) {
+		    ret = -EFAULT;
+		    break;
+		}
             } else {
                 ret = A_ERROR;
             }
@@ -2180,12 +2242,18 @@ int ar6000_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
         case AR6000_XIOCTL_HTC_RAW_WRITE:
             if (arRawIfEnabled(ar)) {
                 unsigned int streamID;
-                get_user(streamID, (unsigned int *)userdata);
-                get_user(length, (unsigned int *)userdata + 1);
+		if (get_user(streamID, (unsigned int *)userdata) ||
+		    get_user(length, (unsigned int *)userdata + 1)) {
+		    ret = -EFAULT;
+		    break;
+		}
                 buffer = (unsigned char*)userdata + sizeof(streamID) + sizeof(length);
                 ret = ar6000_htc_raw_write(ar, (HTC_RAW_STREAM_ID)streamID,
                                            (char*)buffer, length);
-                put_user(ret, (unsigned int *)rq->ifr_data);
+		if (put_user(ret, (unsigned int *)rq->ifr_data)) {
+		    ret = -EFAULT;
+		    break;
+		}
             } else {
                 ret = A_ERROR;
             }
@@ -2193,13 +2261,19 @@ int ar6000_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 #endif /* HTC_RAW_INTERFACE */
 
         case AR6000_XIOCTL_BMI_LZ_STREAM_START:
-            get_user(address, (unsigned int *)userdata);
+	    if (get_user(address, (unsigned int *)userdata)) {
+		ret = -EFAULT;
+		break;
+	    }
             AR_DEBUG_PRINTF(ATH_DEBUG_INFO,("Start Compressed Stream (address: 0x%x)\n", address));
             ret = BMILZStreamStart(hifDevice, address);
             break;
 
         case AR6000_XIOCTL_BMI_LZ_DATA:
-            get_user(length, (unsigned int *)userdata);
+	    if (get_user(length, (unsigned int *)userdata)) {
+		ret = -EFAULT;
+		break;
+	    }
             AR_DEBUG_PRINTF(ATH_DEBUG_INFO,("Send Compressed Data (length: %d)\n", length));
             if ((buffer = (unsigned char *)A_MALLOC(length)) != NULL) {
                 A_MEMZERO(buffer, length);
@@ -2226,8 +2300,11 @@ int ar6000_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
         {
             A_UINT32 period;
             A_UINT32 nbins;
-            get_user(period, (unsigned int *)userdata);
-            get_user(nbins, (unsigned int *)userdata + 1);
+	    if (get_user(period, (unsigned int *)userdata) ||
+		get_user(nbins, (unsigned int *)userdata + 1)) {
+		ret = -EFAULT;
+		break;
+	    }
 
             if (wmi_prof_cfg_cmd(ar->arWmi, period, nbins) != A_OK) {
                 ret = -EIO;
@@ -2240,7 +2317,10 @@ int ar6000_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
         case AR6000_XIOCTL_PROF_ADDR_SET:
         {
             A_UINT32 addr;
-            get_user(addr, (unsigned int *)userdata);
+	    if (get_user(addr, (unsigned int *)userdata)) {
+		ret = -EFAULT;
+		break;
+	    }
 
             if (wmi_prof_addr_set_cmd(ar->arWmi, addr) != A_OK) {
                 ret = -EIO;
@@ -2631,30 +2711,29 @@ int ar6000_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
             if (ar->arWmiReady == FALSE) {
                 ret = -EIO;
-            } else {
-                get_user(cmd.ieType, userdata);
-                if (cmd.ieType >= WMI_MAX_ASSOC_INFO_TYPE) {
-                    ret = -EIO;
-                } else {
-                    get_user(cmd.bufferSize, userdata + 1);
-                    if (cmd.bufferSize > WMI_MAX_ASSOC_INFO_LEN) {
-                        ret = -EFAULT;
-                        break;
-                    }
-                    if (copy_from_user(assocInfo, userdata + 2,
-                                       cmd.bufferSize))
-                    {
-                        ret = -EFAULT;
-                    } else {
-                        if (wmi_associnfo_cmd(ar->arWmi, cmd.ieType,
-                                                 cmd.bufferSize,
-                                                 assocInfo) != A_OK)
-                        {
-                            ret = -EIO;
-                        }
-                    }
-                }
-            }
+		break;
+	    }
+
+	    if (get_user(cmd.ieType, userdata)) {
+		ret = -EFAULT;
+		break;
+	    }
+	    if (cmd.ieType >= WMI_MAX_ASSOC_INFO_TYPE) {
+		ret = -EIO;
+		break;
+	    }
+
+	    if (get_user(cmd.bufferSize, userdata + 1) ||
+		(cmd.bufferSize > WMI_MAX_ASSOC_INFO_LEN) ||
+		copy_from_user(assocInfo, userdata + 2, cmd.bufferSize)) {
+		ret = -EFAULT;
+		break;
+	    }
+	    if (wmi_associnfo_cmd(ar->arWmi, cmd.ieType,
+				  cmd.bufferSize, assocInfo) != A_OK) {
+		ret = -EIO;
+		break;
+	    }
             break;
         }
         case AR6000_IOCTL_WMI_SET_ACCESS_PARAMS:
@@ -3187,10 +3266,10 @@ int ar6000_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
         case AR6000_XIOCTRL_WMI_SET_WLAN_STATE:
         {
             AR6000_WLAN_STATE state;
-            get_user(state, (unsigned int *)userdata);
-            if (ar6000_set_wlan_state(ar, state)!=A_OK) {
+	    if (get_user(state, (unsigned int *)userdata))
+		ret = -EFAULT;
+	    else if (ar6000_set_wlan_state(ar, state) != A_OK)
                 ret = -EIO;
-            }       
             break;
         }
         case AR6000_XIOCTL_WMI_GET_ROAM_DATA:
@@ -3404,19 +3483,28 @@ int ar6000_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
         case AR6000_XIOCTL_DIAG_READ:
         {
             A_UINT32 addr, data;
-            get_user(addr, (unsigned int *)userdata);
+	    if (get_user(addr, (unsigned int *)userdata)) {
+		ret = -EFAULT;
+		break;
+	    }
             addr = TARG_VTOP(ar->arTargetType, addr);
             if (ar6000_ReadRegDiag(ar->arHifDevice, &addr, &data) != A_OK) {
                 ret = -EIO;
             }
-            put_user(data, (unsigned int *)userdata + 1);
+	    if (put_user(data, (unsigned int *)userdata + 1)) {
+		ret = -EFAULT;
+		break;
+	    }
             break;
         }
         case AR6000_XIOCTL_DIAG_WRITE:
         {
             A_UINT32 addr, data;
-            get_user(addr, (unsigned int *)userdata);
-            get_user(data, (unsigned int *)userdata + 1);
+	    if (get_user(addr, (unsigned int *)userdata) ||
+		get_user(data, (unsigned int *)userdata + 1)) {
+		ret = -EFAULT;
+		break;
+	    }
             addr = TARG_VTOP(ar->arTargetType, addr);
             if (ar6000_WriteRegDiag(ar->arHifDevice, &addr, &data) != A_OK) {
                 ret = -EIO;
@@ -3570,12 +3658,18 @@ int ar6000_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
                 ret = -EIO;
                 goto ioctl_done;
             }
-            get_user(fType, (A_UINT32 *)userdata);
+	    if (get_user(fType, (A_UINT32 *)userdata)) {
+		ret = -EFAULT;
+		break;
+	    }
             appIEcmd.mgmtFrmType = fType;
             if (appIEcmd.mgmtFrmType >= IEEE80211_APPIE_NUM_OF_FRAME) {
                 ret = -EIO;
             } else {
-                get_user(ieLen, (A_UINT32 *)(userdata + 4));
+		if (get_user(ieLen, (A_UINT32 *)(userdata + 4))) {
+		    ret = -EFAULT;
+		    break;
+		}
                 appIEcmd.ieLen = ieLen;
                 A_PRINTF("WPSIE: Type-%d, Len-%d\n",appIEcmd.mgmtFrmType, appIEcmd.ieLen);
                 if (appIEcmd.ieLen > IEEE80211_APPIE_FRAME_MAX_LEN) {
@@ -3647,16 +3741,23 @@ int ar6000_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
             A_UINT32 do_activate;
             A_UINT32 rompatch_id;
 
-            get_user(ROM_addr, (A_UINT32 *)userdata);
-            get_user(RAM_addr, (A_UINT32 *)userdata + 1);
-            get_user(nbytes, (A_UINT32 *)userdata + 2);
-            get_user(do_activate, (A_UINT32 *)userdata + 3);
+	    if (get_user(ROM_addr, (A_UINT32 *)userdata) ||
+		get_user(RAM_addr, (A_UINT32 *)userdata + 1) ||
+		get_user(nbytes, (A_UINT32 *)userdata + 2) ||
+		get_user(do_activate, (A_UINT32 *)userdata + 3)) {
+		ret = -EFAULT;
+		break;
+	    }
             AR_DEBUG_PRINTF(ATH_DEBUG_INFO,("Install rompatch from ROM: 0x%x to RAM: 0x%x  length: %d\n",
                              ROM_addr, RAM_addr, nbytes));
             ret = BMIrompatchInstall(hifDevice, ROM_addr, RAM_addr,
                                         nbytes, do_activate, &rompatch_id);
             if (ret == A_OK) {
-                put_user(rompatch_id, (unsigned int *)rq->ifr_data); /* return value */
+		/* return value */
+		if (put_user(rompatch_id, (unsigned int *)rq->ifr_data)) {
+		    ret = -EFAULT;
+		    break;
+		}
             }
             break;
         }
@@ -3665,7 +3766,10 @@ int ar6000_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
         {
             A_UINT32 rompatch_id;
 
-            get_user(rompatch_id, (A_UINT32 *)userdata);
+	    if (get_user(rompatch_id, (A_UINT32 *)userdata)) {
+		ret = -EFAULT;
+		break;
+	    }
             AR_DEBUG_PRINTF(ATH_DEBUG_INFO,("UNinstall rompatch_id %d\n", rompatch_id));
             ret = BMIrompatchUninstall(hifDevice, rompatch_id);
             break;
@@ -3676,7 +3780,10 @@ int ar6000_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
         {
             A_UINT32 rompatch_count;
 
-            get_user(rompatch_count, (A_UINT32 *)userdata);
+	    if (get_user(rompatch_count, (A_UINT32 *)userdata)) {
+		ret = -EFAULT;
+		break;
+	    }
             AR_DEBUG_PRINTF(ATH_DEBUG_INFO,("Change rompatch activation count=%d\n", rompatch_count));
             length = sizeof(A_UINT32) * rompatch_count;
             if ((buffer = (unsigned char *)A_MALLOC(length)) != NULL) {
@@ -4500,7 +4607,10 @@ int ar6000_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
         case AR6000_XIOCTL_SET_BT_HW_POWER_STATE:
         {
             unsigned int state;
-            get_user(state, (unsigned int *)userdata);
+	    if (get_user(state, (unsigned int *)userdata)) {
+		ret = -EFAULT;
+		break;
+	    }
             if (ar6000_set_bt_hw_state(ar, state)!=A_OK) {
                 ret = -EIO;
             }       

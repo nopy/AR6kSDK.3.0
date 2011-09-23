@@ -192,6 +192,10 @@ static A_STATUS wmi_btcoex_stats_event_rx(struct wmi_t *wmip, A_UINT8 *datap, in
 #endif
 static A_STATUS wmi_hci_event_rx(struct wmi_t *, A_UINT8 *, int);
 
+#ifdef WAPI_ENABLE
+static A_STATUS wmi_wapi_rekey_event_rx(struct wmi_t *wmip, A_UINT8 *datap,
+                                     int len);
+#endif
 
 #if defined(UNDER_CE)
 #if defined(NDIS51_MINIPORT)
@@ -1156,6 +1160,12 @@ wmi_control_rx(struct wmi_t *wmip, void *osbuf)
     case (WMI_HCI_EVENT_EVENTID):
         status = wmi_hci_event_rx(wmip, datap, len);
         break;
+#ifdef WAPI_ENABLE
+    case (WMI_WAPI_REKEY_EVENTID):
+        A_DPRINTF(DBG_WMI, (DBGFMT "WMI_WAPI_REKEY_EVENTID", DBGARG));
+        status = wmi_wapi_rekey_event_rx(wmip, datap, len);
+        break;
+#endif
     default:
         A_DPRINTF(DBG_WMI|DBG_ERROR,
             (DBGFMT "Unknown id 0x%x\n", DBGARG, id));
@@ -1434,11 +1444,9 @@ wmi_bssInfo_event_rx(struct wmi_t *wmip, A_UINT8 *datap, int len)
     buf = datap + sizeof(WMI_BSS_INFO_HDR);
     len -= sizeof(WMI_BSS_INFO_HDR);
 
-    A_DPRINTF(DBG_WMI2, (DBGFMT "bssInfo event - ch %u, rssi %02x, "
-              "bssid \"%02x:%02x:%02x:%02x:%02x:%02x\"\n", DBGARG,
-              bih->channel, (unsigned char) bih->rssi, bih->bssid[0],
-              bih->bssid[1], bih->bssid[2], bih->bssid[3], bih->bssid[4],
-              bih->bssid[5]));
+	A_DPRINTF(DBG_WMI2, (DBGFMT "bssInfo event - ch %u, rssi %02x, "
+		"bssid \"%pM\"\n", DBGARG, bih->channel,
+		(unsigned char) bih->rssi, bih->bssid));
 
     if(wps_enable && (bih->frameType == PROBERESP_FTYPE) ) {
         wmi_node_return(wmip, bss);
@@ -1474,7 +1482,7 @@ wmi_bssInfo_event_rx(struct wmi_t *wmip, A_UINT8 *datap, int len)
          * The average value of RSSI give end-user better feeling for instance value of scan result
          * It also sync up RSSI info in GUI between scan result and RSSI signal icon
          */
-        if (bss && IEEE80211_ADDR_EQ(wmip->wmi_bssid, bih->bssid)) {
+        if (IEEE80211_ADDR_EQ(wmip->wmi_bssid, bih->bssid)) {
             bih->rssi = bss->ni_rssi;
             bih->snr  = bss->ni_snr;
         }
@@ -2863,7 +2871,11 @@ wmi_addKey_cmd(struct wmi_t *wmip, A_UINT8 keyIndex, CRYPTO_TYPE keyType,
     cmd->keyUsage = keyUsage;
     cmd->keyLength = keyLength;
     A_MEMCPY(cmd->key, keyMaterial, keyLength);
+#ifdef WAPI_ENABLE
+    if (NULL != keyRSC && key_op_ctrl != KEY_OP_INIT_WAPIPN) {
+#else
     if (NULL != keyRSC) {
+#endif /* WAPI_ENABLE */
         A_MEMCPY(cmd->keyRSC, keyRSC, sizeof(cmd->keyRSC));
     }
     cmd->key_op_ctrl = key_op_ctrl;
@@ -6209,6 +6221,21 @@ wmi_dtimexpiry_event_rx(struct wmi_t *wmip, A_UINT8 *datap,int len)
     return A_OK;
 }
 
+#ifdef WAPI_ENABLE
+static A_STATUS
+wmi_wapi_rekey_event_rx(struct wmi_t *wmip, A_UINT8 *datap,int len)
+{
+    A_UINT8 *ev;
+
+    if (len < 7) {
+        return A_EINVAL;
+    }
+    ev = (A_UINT8 *)datap;
+
+    A_WMI_WAPI_REKEY_EVENT(wmip->wmi_devt, *ev, &ev[1]);
+    return A_OK;
+}
+#endif
 
 A_STATUS
 wmi_set_pvb_cmd(struct wmi_t *wmip, A_UINT16 aid, A_BOOL flag)

@@ -44,7 +44,7 @@ endif
 
   # Some common variable
   ATH_ARCH_CPU_TYPE := arm 
-  ATH_CROSS_COMPILE_TYPE := /extra/work/cyanogen/android/system/prebuilt/linux-x86/toolchain/arm-eabi-4.4.3/bin/arm-eabi-
+  #ATH_CROSS_COMPILE_TYPE := ../../prebuilt/linux-x86/toolchain/arm-eabi-4.3.1/bin/arm-eabi-
   ATH_BUS_TYPE := SDIO
   ATH_OS_SUB_TYPE := linux_2_6
   ATH_BUS_SUBTYPE := linux_sdio
