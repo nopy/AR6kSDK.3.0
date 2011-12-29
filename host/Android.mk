@@ -22,9 +22,8 @@ ifneq ($(TARGET_SIMULATOR),true)
 LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
-
 #ATH_ANDROID_SRC_BASE:= $(BOARD_WLAN_ATHEROS_SDK)
-ATH_ANDROID_SRC_BASE:= $(LOCAL_PATH)/..
+ATH_ANDROID_SRC_BASE:= $(LOCAL_PATH)
 export ATH_BSP_TYPE=Folio100
 export  ATH_BUILD_TYPE=ANDROID_ARM_NATIVEMMC
 export  ATH_BUS_TYPE=sdio
@@ -32,7 +31,8 @@ export  ATH_OS_SUB_TYPE=linux_2_6
 
 ATH_ANDROID_ROOT:= $(CURDIR)
 #export ATH_SRC_BASE:= ../$(ATH_ANDROID_SRC_BASE)/host
-export ATH_SRC_BASE:=$(ATH_ANDROID_ROOT)/$(ATH_ANDROID_SRC_BASE)/host
+export ATH_SRC_BASE:=$(ATH_ANDROID_ROOT)/$(ATH_ANDROID_SRC_BASE)
+
 #ATH_CROSS_COMPILE_TYPE:=$(ATH_ANDROID_ROOT)/$(TARGET_TOOLS_PREFIX)
 ATH_CROSS_COMPILE_TYPE:=$(ATH_ANDROID_ROOT)/prebuilt/linux-x86/toolchain/arm-eabi-4.4.3/bin/arm-eabi-
 $(warning TARGET_OUT_INTERMEDIATES $(TARGET_OUT_INTERMEDIATES))
@@ -79,7 +79,7 @@ $(mod_cleanup) :
 	rm -f `find $(ATH_SRC_BASE) -name "*.o"`
 	mkdir -p $(TARGET_OUT)/wifi/ath6k/AR6003/hw2.0/
     
-mod_file := $(ATH_SRC_BASE)/os/linux/ar6000.ko
+mod_file := $(ATH_ANDROID_SRC_BASE)/os/linux/ar6000.ko
 $(warning mod_file $(mod_file) )
 $(mod_file) : $(mod_cleanup) $(INSTALLED_KERNEL_TARGET)  $(ACP)
 	$(MAKE) ARCH=arm CROSS_COMPILE=$(ATH_CROSS_COMPILE_TYPE) -C $(ATH_LINUXPATH) ATH_BUILD_OUTPUT_OVERRIDE=$(ATH_FULL_TARGET_OUTPUT) O=$(ATH_FULL_TARGET_OUTPUT) ATH_HIF_TYPE=$(ATH_HIF_TYPE) SUBDIRS=$(ATH_SRC_BASE)/os/linux modules
