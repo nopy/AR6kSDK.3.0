@@ -77,6 +77,7 @@ mod_cleanup := $(ATH_TARGET_OUTPUT)
 $(mod_cleanup) :
 	mkdir -p  $(ATH_TARGET_OUTPUT)
 	rm -f `find $(ATH_SRC_BASE) -name "*.o"`
+	rm -f `find $(ATH_SRC_BASE) -name "*.o.cmd"`
 	mkdir -p $(TARGET_OUT)/wifi/ath6k/AR6003/hw2.0/
     
 mod_file := $(ATH_ANDROID_SRC_BASE)/os/linux/ar6000.ko
