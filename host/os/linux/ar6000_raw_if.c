@@ -199,8 +199,13 @@ int ar6000_htc_raw_open(AR_SOFTC_T *ar)
         
     for (streamID = HTC_RAW_STREAM_0; streamID < HTC_RAW_STREAM_NUM_MAX; streamID++) {
         /* Initialize the data structures */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 39))
         init_MUTEX(&arRaw->raw_htc_read_sem[streamID]);
         init_MUTEX(&arRaw->raw_htc_write_sem[streamID]);
+#else
+        sema_init(&arRaw->raw_htc_read_sem[streamID],1);
+        sema_init(&arRaw->raw_htc_write_sem[streamID],1);
+#endif
         init_waitqueue_head(&arRaw->raw_htc_read_queue[streamID]);
         init_waitqueue_head(&arRaw->raw_htc_write_queue[streamID]);
 
