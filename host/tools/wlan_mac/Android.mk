@@ -22,7 +22,8 @@ ifneq ($(TARGET_SIMULATOR),true)
 LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
-ALL_PREBUILT += $(TARGET_OUT)/bin/wlan_mac
+#PRODUCT_COPY_FILES += $(LOCAL_PATH)/wlan_mac:system/bin/wlan_mac
+
 
 $(TARGET_OUT)/bin/wlan_mac : $(LOCAL_PATH)/wlan_mac | $(ACP)
 	$(transform-prebuilt-to-target)

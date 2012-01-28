@@ -291,7 +291,11 @@ static A_STATUS bt_setup_hci_pal(ar6k_hci_pal_info_t *pHciPalInfo)
 
 		/* save the device, we'll register this later */
 		pHciPalInfo->hdev = pHciDev;       
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 39))
                 SET_HCI_BUS_TYPE(pHciDev, HCI_VIRTUAL, HCI_80211);
+#else
+                SET_HCI_BUS_TYPE(pHciDev, HCI_VIRTUAL, HCI_AMP);
+#endif
 		pHciDev->driver_data = pHciPalInfo;
 		pHciDev->open     = bt_open;
 		pHciDev->close    = bt_close;

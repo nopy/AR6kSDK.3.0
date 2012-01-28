@@ -86,7 +86,7 @@
  * 2 - WoW
  * 3 - CUT_POWER if BT OFF (clock sharing designs only)
  */
-#define WLAN_CONFIG_PM_SUSPEND             2
+#define WLAN_CONFIG_PM_SUSPEND             0
 
 /*
  * This configuration item sets suspend policy to use if PM_SUSPEND is
@@ -96,7 +96,7 @@
  * 2 - WoW
  * 3 - CUT_POWER if BT OFF (clock sharing designs only)
  */
-#define WLAN_CONFIG_PM_WOW2                3
+#define WLAN_CONFIG_PM_WOW2                0
 
 /* 
  * Define GPIO number for WoW in your platform other than zero 
