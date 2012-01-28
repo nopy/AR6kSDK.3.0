@@ -13,7 +13,7 @@ ATH_BSP_TYPE=Folio100
 #ATH_ANDROID_ROOT=< android sdk full path >
 
 # Kernel path
-ATH_LINUXPATH := /home/artem/bin/new-kernel/android-tegra-nv-2.6.39
+ATH_LINUXPATH := /home/artem/bin/new-kernel/android-tegra-2.6.36-hc-dev
 
 ifneq (0, $(shell test -d $(ATH_LINUXPATH) && echo $$?))
 $(error $(ATH_LINUXPATH) does not exist)
