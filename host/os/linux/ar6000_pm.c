@@ -561,6 +561,7 @@ static int ar6000_pm_remove(struct platform_device *pdev)
 
 static int ar6000_pm_suspend(struct platform_device *pdev, pm_message_t state)
 {
+    plat_setup_power(NULL, 0, 0);
     return 0;
 }
 
@@ -568,6 +569,7 @@ static int ar6000_pm_resume(struct platform_device *pdev)
 {
     int i;
     extern struct net_device *ar6000_devices[MAX_AR6000];
+    plat_setup_power(NULL, 1, 1);
     for (i=0; ar6000_devices[i]; ++i) {
          AR_SOFTC_T *ar = (AR_SOFTC_T *)ar6k_priv(ar6000_devices[i]);
          if (ar && ar->arPlatPowerOff) {
