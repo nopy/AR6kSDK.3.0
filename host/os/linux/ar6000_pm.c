@@ -386,6 +386,8 @@ static A_STATUS ar6000_wow_suspend(AR_SOFTC_T *ar)
 
 A_STATUS ar6000_suspend_ev(void *context)
 {
+    AR_DEBUG_PRINTF(ATH_DEBUG_ERR,("*** ar6000_suspend_ev ***\n"));
+
     A_STATUS status = A_OK;
     AR_SOFTC_T *ar = (AR_SOFTC_T *)context;
     A_INT16 pmmode = ar->arSuspendConfig;
@@ -446,6 +448,7 @@ wow_not_connected:
 
 A_STATUS ar6000_resume_ev(void *context)
 {
+    AR_DEBUG_PRINTF(ATH_DEBUG_ERR,("*** ar6000_resume_ev ***\n"));
     AR_SOFTC_T *ar = (AR_SOFTC_T *)context;
     A_UINT16 powerState = ar->arWlanPowerState;
 
