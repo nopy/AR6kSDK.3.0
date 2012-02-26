@@ -35,6 +35,8 @@
 #endif /* ATH6K_CONFIG_CFG80211 */
 #include <linux/module.h>
 #include <asm/io.h>
+#include <linux/irqreturn.h>
+#include <linux/interrupt.h>
 
 #include <a_config.h>
 #include <athdefs.h>
