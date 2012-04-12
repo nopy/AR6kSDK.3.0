@@ -474,7 +474,16 @@ A_STATUS AR3KConfigure(AR3K_CONFIG_INFO *pConfig)
                 break;    
             }    
         }
-        
+
+/*/ Abon[START] - Add: Move to the beginning (201009142003) */
+ 	if (pConfig->Flags & 
+                (AR3K_CONFIG_FLAG_SET_AR3K_BAUD | AR3K_CONFIG_FLAG_SET_AR6K_SCALE_STEP)) {
+            status = AR3KConfigureHCIBaud(pConfig);      
+            if (A_FAILED(status)) {
+                break;    
+            }
+        }
+/*/ Abon[END] - Add: Move to the beginning (201009142003)        */
        
         /* Load patching and PST file if available*/
         if (A_OK != AthPSInitialize(pConfig)) {
@@ -484,14 +493,15 @@ A_STATUS AR3KConfigure(AR3K_CONFIG_INFO *pConfig)
         /* Send HCI reset to make PS tags take effect*/
         AR3KConfigureSendHCIReset(pConfig);
 
- 	if (pConfig->Flags & 
+/*/ Abon[START] - Delete: Move to the beginning (201009142003) */
+ 	/***if (pConfig->Flags & 
                 (AR3K_CONFIG_FLAG_SET_AR3K_BAUD | AR3K_CONFIG_FLAG_SET_AR6K_SCALE_STEP)) {
             status = AR3KConfigureHCIBaud(pConfig);      
             if (A_FAILED(status)) {
                 break;    
             }
-        }     
-
+        }***/  
+/*/ Abon[END] - Delete: Move to the beginning (201009142003) */
 
 
         if (pConfig->PwrMgmtEnabled) {

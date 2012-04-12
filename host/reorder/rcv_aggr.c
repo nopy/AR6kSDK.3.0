@@ -103,9 +103,7 @@ aggr_delete_tid_state(AGGR_INFO *p_aggr, A_UINT8 tid)
     RXTID_STATS *stats;
 
     A_ASSERT(tid < NUM_OF_TIDS && p_aggr);
-    if (!(tid < NUM_OF_TIDS && p_aggr)) {
-        return; /* in case panic_on_assert==0 */
-    }
+
     rxtid = AGGR_GET_RXTID(p_aggr, tid);
     stats = AGGR_GET_RXTID_STATS(p_aggr, tid);
 
@@ -229,7 +227,6 @@ aggr_recv_addba_req_evt(void *cntxt, A_UINT8 tid, A_UINT16 seq_no, A_UINT8 win_s
     if((rxtid->hold_q == NULL)) {
         A_PRINTF("Failed to allocate memory, tid = %d\n", tid);
         A_ASSERT(0);
-        return; /* in case panic_on_assert==0 */
     }
     A_MEMZERO(rxtid->hold_q, HOLD_Q_SZ(win_sz));
 

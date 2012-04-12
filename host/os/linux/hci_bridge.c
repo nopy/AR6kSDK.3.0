@@ -112,7 +112,7 @@ AR3K_CONFIG_INFO      ar3kconfig;
 #ifdef EXPORT_HCI_BRIDGE_INTERFACE
 AR6K_HCI_BRIDGE_INFO *g_pHcidevInfo;
 #endif
-
+extern int wificheck;
 static A_STATUS bt_setup_hci(AR6K_HCI_BRIDGE_INFO *pHcidevInfo);
 static void     bt_cleanup_hci(AR6K_HCI_BRIDGE_INFO *pHcidevInfo);
 static A_STATUS bt_register_hci(AR6K_HCI_BRIDGE_INFO *pHcidevInfo);
@@ -219,6 +219,14 @@ static void RefillRecvBuffers(AR6K_HCI_BRIDGE_INFO      *pHcidevInfo,
     }
 }
 
+/* ATHENV */
+/* NCHENG */
+#if 0
+extern unsigned int ath_bt_en;
+#endif
+/* NCHENG */
+/* ATHENV */
+
 #define HOST_INTEREST_ITEM_ADDRESS(ar, item) \
         (((ar)->arTargetType == TARGET_TYPE_AR6002) ? AR6002_HOST_INTEREST_ITEM_ADDRESS(item) : \
         (((ar)->arTargetType == TARGET_TYPE_AR6003) ? AR6003_HOST_INTEREST_ITEM_ADDRESS(item) : 0))
@@ -230,7 +238,7 @@ static A_STATUS ar6000_hci_transport_ready(HCI_TRANSPORT_HANDLE     HCIHandle,
     A_STATUS              status;
     A_UINT32 address, hci_uart_pwr_mgmt_params;
 /*    AR3K_CONFIG_INFO      ar3kconfig; */
-    
+    wificheck = 1;  
     pHcidevInfo->pHCIDev = HCIHandle;
     
     A_MEMCPY(&pHcidevInfo->HCIProps,pProps,sizeof(*pProps));
@@ -312,10 +320,13 @@ static A_STATUS ar6000_hci_transport_ready(HCI_TRANSPORT_HANDLE     HCIHandle,
 		memcpy(ar3kconfig.bdaddr,pHcidevInfo->ar->bdaddr,6);
         status = AR3KConfigure(&ar3kconfig);
         if (A_FAILED(status)) {
-            extern unsigned int setuphci;
-            AR_DEBUG_PRINTF(ATH_DEBUG_ERR, ("HCI Bridge: Fail to configure AR3K. No device? Cleanup HCI\n"));
-            ar6000_cleanup_hci(pHcidevInfo->ar);
-            setuphci = 0;
+            extern unsigned int setuphci;	/*/ Wilson - Add (28Aug2010)  */
+            pHcidevInfo->ar->exitCallback = NULL;   /*/// Abon - Add (27Aug2010) */
+            /*/ar6000_cleanup_hci(pHcidevInfo->ar);	/// Wilson - Add (28Aug2010)  */
+            setuphci = 0;	/*/ Wilson - Add (28Aug2010)  */
+/* ATHENV */
+            pHcidevInfo->ar->arBTSharing = 0;
+/* ATHENV */
             break; 
         }
 
@@ -328,6 +339,9 @@ static A_STATUS ar6000_hci_transport_ready(HCI_TRANSPORT_HANDLE     HCIHandle,
         }
         
         status = bt_register_hci(pHcidevInfo);
+/* ATHENV */
+        pHcidevInfo->ar->arBTSharing = 1;
+/* ATHENV */
         
     } while (FALSE);
 
@@ -426,7 +440,7 @@ static void ar6000_hci_pkt_recv(void *pContext, HTC_PACKET *pPacket)
         if ((pHcidevInfo->ar->arNetDev->flags & IFF_UP) == IFF_UP) {
             skb->protocol = eth_type_trans(skb, pHcidevInfo->ar->arNetDev);
 #endif
-            A_NETIF_RX(skb);
+            netif_rx(skb);
             skb = NULL;
         } 
         
@@ -582,6 +596,8 @@ void  ar6000_cleanup_hci(AR_SOFTC_T *ar)
 #else
     AR6K_HCI_BRIDGE_INFO *pHcidevInfo = (AR6K_HCI_BRIDGE_INFO *)ar->hcidev_info;
 #endif
+
+    ar->exitCallback = NULL;	/*/ Wilson - Add (28Aug2010)  */
     
     if (pHcidevInfo != NULL) {
         bt_cleanup_hci(pHcidevInfo);   
@@ -600,7 +616,6 @@ void  ar6000_cleanup_hci(AR_SOFTC_T *ar)
         A_FREE(pHcidevInfo);
 #ifndef EXPORT_HCI_BRIDGE_INTERFACE
         ar->hcidev_info = NULL;
-        ar->exitCallback = NULL;
 #endif
     }
     
@@ -904,7 +919,12 @@ static A_STATUS bt_setup_hci(AR6K_HCI_BRIDGE_INFO *pHcidevInfo)
             /* save the device, we'll register this later */
         pHcidevInfo->pBtStackHCIDev = pHciDev;       
         SET_HCIDEV_DEV(pHciDev,osDevInfo.pOSDevice);          
-        SET_HCI_BUS_TYPE(pHciDev, HCI_VIRTUAL, HCI_BREDR);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,34)
+	pHciDev->type = HCI_VIRTUAL;
+#else
+	pHciDev->bus = HCI_VIRTUAL;
+	pHciDev->dev_type = HCI_BREDR;
+#endif
         pHciDev->driver_data = pHcidevInfo;
         pHciDev->open     = bt_open;
         pHciDev->close    = bt_close;

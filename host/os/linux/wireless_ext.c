@@ -19,30 +19,6 @@
 
 #include "ar6000_drv.h"
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27)
-#define IWE_STREAM_ADD_EVENT(p1, p2, p3, p4, p5) \
-    iwe_stream_add_event((p1), (p2), (p3), (p4), (p5))
-#else
-#define IWE_STREAM_ADD_EVENT(p1, p2, p3, p4, p5) \
-    iwe_stream_add_event((p2), (p3), (p4), (p5))
-#endif
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27)
-#define IWE_STREAM_ADD_POINT(p1, p2, p3, p4, p5) \
-    iwe_stream_add_point((p1), (p2), (p3), (p4), (p5))
-#else
-#define IWE_STREAM_ADD_POINT(p1, p2, p3, p4, p5) \
-    iwe_stream_add_point((p2), (p3), (p4), (p5))
-#endif
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27)
-#define IWE_STREAM_ADD_VALUE(p1, p2, p3, p4, p5, p6) \
-    iwe_stream_add_value((p1), (p2), (p3), (p4), (p5), (p6))
-#else
-#define IWE_STREAM_ADD_VALUE(p1, p2, p3, p4, p5, p6) \
-    iwe_stream_add_value((p2), (p3), (p4), (p5), (p6))
-#endif
-
 static void ar6000_set_quality(struct iw_quality *iq, A_INT8 rssi);
 extern unsigned int wmitimeout;
 extern A_WAITQUEUE_HEAD arEvent;
@@ -125,8 +101,12 @@ ar6000_scan_node(void *arg, bss_t *ni)
         iwe.cmd = SIOCGIWAP;
         iwe.u.ap_addr.sa_family = ARPHRD_ETHER;
         A_MEMCPY(iwe.u.ap_addr.sa_data, ni->ni_macaddr, 6);
-        current_ev = IWE_STREAM_ADD_EVENT(param->info, current_ev, end_buf,
-                                          &iwe, IW_EV_ADDR_LEN);
+        current_ev = iwe_stream_add_event(
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27)
+                          param->info,
+#endif
+                          current_ev, end_buf, &iwe,
+                          IW_EV_ADDR_LEN);
     }
     param->bytes_needed += IW_EV_ADDR_LEN;
 
@@ -137,8 +117,12 @@ ar6000_scan_node(void *arg, bss_t *ni)
         iwe.cmd = SIOCGIWESSID;
         iwe.u.data.flags = 1;
         iwe.u.data.length = cie->ie_ssid[1];
-        current_ev = IWE_STREAM_ADD_POINT(param->info, current_ev, end_buf,
-                                          &iwe, (char*)&cie->ie_ssid[2]);
+        current_ev = iwe_stream_add_point(
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27)
+                          param->info,
+#endif
+                          current_ev, end_buf, &iwe,
+                          (char*)&cie->ie_ssid[2]);
     }
     param->bytes_needed += data_len;
 
@@ -149,8 +133,12 @@ ar6000_scan_node(void *arg, bss_t *ni)
             iwe.cmd = SIOCGIWMODE;
             iwe.u.mode = cie->ie_capInfo & IEEE80211_CAPINFO_ESS ?
                          IW_MODE_MASTER : IW_MODE_ADHOC;
-            current_ev = IWE_STREAM_ADD_EVENT(param->info, current_ev, end_buf,
-                                              &iwe, IW_EV_UINT_LEN);
+            current_ev = iwe_stream_add_event(
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27)
+                          param->info,
+#endif
+                          current_ev, end_buf, &iwe,
+                          IW_EV_UINT_LEN);
         }
         param->bytes_needed += IW_EV_UINT_LEN;
     }
@@ -161,8 +149,12 @@ ar6000_scan_node(void *arg, bss_t *ni)
         iwe.cmd = SIOCGIWFREQ;
         iwe.u.freq.m = cie->ie_chan * 100000;
         iwe.u.freq.e = 1;
-        current_ev = IWE_STREAM_ADD_EVENT(param->info, current_ev, end_buf,
-                                          &iwe, IW_EV_FREQ_LEN);
+        current_ev = iwe_stream_add_event(
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27)
+                          param->info,
+#endif
+                          current_ev, end_buf, &iwe,
+                          IW_EV_FREQ_LEN);
     }
     param->bytes_needed += IW_EV_FREQ_LEN;
 
@@ -171,8 +163,12 @@ ar6000_scan_node(void *arg, bss_t *ni)
         A_MEMZERO(&iwe, sizeof(iwe));
         iwe.cmd = IWEVQUAL;
         ar6000_set_quality(&iwe.u.qual, ni->ni_snr);
-        current_ev = IWE_STREAM_ADD_EVENT(param->info, current_ev, end_buf,
-                                          &iwe, IW_EV_QUAL_LEN);
+        current_ev = iwe_stream_add_event(
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27)
+                          param->info,
+#endif
+                          current_ev, end_buf, &iwe,
+                          IW_EV_QUAL_LEN);
     }
     param->bytes_needed += IW_EV_QUAL_LEN;
 
@@ -186,8 +182,11 @@ ar6000_scan_node(void *arg, bss_t *ni)
             iwe.u.data.flags = IW_ENCODE_DISABLED;
         }
         iwe.u.data.length = 0;
-        current_ev = IWE_STREAM_ADD_POINT(param->info, current_ev, end_buf,
-                                          &iwe, "");
+        current_ev = iwe_stream_add_point(
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27)
+                          param->info,
+#endif
+                          current_ev, end_buf, &iwe, "");
     }
     param->bytes_needed += IW_EV_POINT_LEN;
 
@@ -210,9 +209,15 @@ ar6000_scan_node(void *arg, bss_t *ni)
                     val = cie->ie_rates[2 + j];
                     iwe.u.bitrate.value =
                         (val >= 0x80)? ((val - 0x80) * 500000): (val * 500000);
-                    current_val = IWE_STREAM_ADD_VALUE(param->info, current_ev,
-                                                       current_val, end_buf,
-                                                       &iwe, IW_EV_PARAM_LEN);
+                    current_val = iwe_stream_add_value(
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27)
+                                      param->info,
+#endif
+                                      current_ev,
+                                      current_val,
+                                      end_buf,
+                                      &iwe,
+                                      IW_EV_PARAM_LEN);
             }
         }
         param->bytes_needed += data_len;
@@ -228,9 +233,15 @@ ar6000_scan_node(void *arg, bss_t *ni)
                     val = cie->ie_xrates[2 + j];
                     iwe.u.bitrate.value =
                         (val >= 0x80)? ((val - 0x80) * 500000): (val * 500000);
-                    current_val = IWE_STREAM_ADD_VALUE(param->info, current_ev,
-                                                       current_val, end_buf,
-                                                       &iwe, IW_EV_PARAM_LEN);
+                    current_val = iwe_stream_add_value(
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27)
+                                      param->info,
+#endif
+                                      current_ev,
+                                      current_val,
+                                      end_buf,
+                                      &iwe,
+                                      IW_EV_PARAM_LEN);
             }
         }
         param->bytes_needed += data_len;
@@ -248,8 +259,11 @@ ar6000_scan_node(void *arg, bss_t *ni)
             A_MEMZERO(&iwe, sizeof(iwe));
             iwe.cmd = IWEVGENIE;
             iwe.u.data.length = cie->ie_wpa[1] + 2;
-            current_ev = IWE_STREAM_ADD_POINT(param->info, current_ev, end_buf,
-                                              &iwe, (char*)cie->ie_wpa);
+            current_ev = iwe_stream_add_point(
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27)
+                          param->info,
+#endif
+                          current_ev, end_buf, &iwe, (char*)cie->ie_wpa);
         }
         param->bytes_needed += data_len;
     }
@@ -261,8 +275,11 @@ ar6000_scan_node(void *arg, bss_t *ni)
             A_MEMZERO(&iwe, sizeof(iwe));
             iwe.cmd = IWEVGENIE;
             iwe.u.data.length = cie->ie_rsn[1] + 2;
-            current_ev = IWE_STREAM_ADD_POINT(param->info, current_ev, end_buf,
-                                              &iwe, (char*)cie->ie_rsn);
+            current_ev = iwe_stream_add_point(
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27)
+                          param->info,
+#endif
+                          current_ev, end_buf, &iwe, (char*)cie->ie_rsn);
         }
         param->bytes_needed += data_len;
     }
@@ -291,8 +308,11 @@ ar6000_scan_node(void *arg, bss_t *ni)
             snprintf(iwe.u.name, IFNAMSIZ, "IEEE 802.11b");
             break;
         }
-        current_ev = IWE_STREAM_ADD_EVENT(param->info, current_ev, end_buf,
-                                          &iwe, IW_EV_CHAR_LEN);
+        current_ev = iwe_stream_add_event(
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27)
+                          param->info,
+#endif
+                          current_ev, end_buf, &iwe, IW_EV_CHAR_LEN);
     }
     param->bytes_needed += IW_EV_CHAR_LEN;
 
@@ -303,8 +323,11 @@ ar6000_scan_node(void *arg, bss_t *ni)
     data_len = iwe.u.data.length + IW_EV_POINT_LEN;
     if ((end_buf - current_ev) > data_len)
     {
-        current_ev = IWE_STREAM_ADD_POINT(param->info, current_ev, end_buf,
-                                          &iwe, buf);
+        current_ev = iwe_stream_add_point(
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27)
+                          param->info,
+#endif
+                          current_ev, end_buf, &iwe, buf);
     }
     param->bytes_needed += data_len;
 
@@ -321,8 +344,11 @@ ar6000_scan_node(void *arg, bss_t *ni)
                                           wpa_leader, sizeof(wpa_leader)-1);
 
             if (iwe.u.data.length != 0) {
-                current_ev = IWE_STREAM_ADD_POINT(param->info, current_ev, 
-                                                  end_buf, &iwe, buf);
+                current_ev = iwe_stream_add_point(
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27)
+                              param->info,
+#endif
+                              current_ev, end_buf, &iwe, buf);
             }
         }
         param->bytes_needed += data_len;
@@ -340,8 +366,11 @@ ar6000_scan_node(void *arg, bss_t *ni)
                                           rsn_leader, sizeof(rsn_leader)-1);
 
             if (iwe.u.data.length != 0) {
-                current_ev = IWE_STREAM_ADD_POINT(param->info, current_ev, 
-                                                  end_buf, &iwe, buf);
+                current_ev = iwe_stream_add_point(
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27)
+                              param->info,
+#endif
+                              current_ev, end_buf, &iwe, buf);
             }
         }
         param->bytes_needed += data_len;
@@ -359,8 +388,11 @@ ar6000_scan_node(void *arg, bss_t *ni)
                                           cie->ie_wmm[1]+2,
                                           wmm_leader, sizeof(wmm_leader)-1);
             if (iwe.u.data.length != 0) {
-                current_ev = IWE_STREAM_ADD_POINT(param->info, current_ev,
-                                                  end_buf, &iwe, buf);
+                current_ev = iwe_stream_add_point(
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27)
+                              param->info,
+#endif
+                              current_ev, end_buf, &iwe, buf);
             }
         }
         param->bytes_needed += data_len;
@@ -377,31 +409,16 @@ ar6000_scan_node(void *arg, bss_t *ni)
                                           cie->ie_ath[1]+2,
                                           ath_leader, sizeof(ath_leader)-1);
             if (iwe.u.data.length != 0) {
-                current_ev = IWE_STREAM_ADD_POINT(param->info, current_ev,
-                                                  end_buf, &iwe, buf);
+                current_ev = iwe_stream_add_point(
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27)
+                              param->info,
+#endif
+                              current_ev, end_buf, &iwe, buf);
             }
         }
         param->bytes_needed += data_len;
     }
 
-#ifdef WAPI_ENABLE
-    if (cie->ie_wapi != NULL) {
-        static const char wapi_leader[] = "wapi_ie=";
-        data_len = (sizeof(wapi_leader) - 1) + ((cie->ie_wapi[1] + 2) * 2) + IW_EV_POINT_LEN;
-        if ((end_buf - current_ev) > data_len) {
-            A_MEMZERO(&iwe, sizeof(iwe));
-            iwe.cmd = IWEVCUSTOM;
-            iwe.u.data.length = encode_ie(buf, sizeof(buf), cie->ie_wapi,
-                                      cie->ie_wapi[1] + 2,
-                                      wapi_leader, sizeof(wapi_leader) - 1);
-            if (iwe.u.data.length != 0) {
-                current_ev = IWE_STREAM_ADD_POINT(param->info, current_ev,
-                                                  end_buf, &iwe, buf);
-            }
-        }
-        param->bytes_needed += data_len;
-    }
-#endif /* WAPI_ENABLE */
 
 #endif /* WIRELESS_EXT > 14 */
 
@@ -413,8 +430,11 @@ ar6000_scan_node(void *arg, bss_t *ni)
             A_MEMZERO(&iwe, sizeof(iwe));
             iwe.cmd = IWEVGENIE;
             iwe.u.data.length = cie->ie_wsc[1] + 2;
-            current_ev = IWE_STREAM_ADD_POINT(param->info, current_ev, end_buf,
-                                              &iwe, (char*)cie->ie_wsc);
+            current_ev = iwe_stream_add_point(
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27)
+                          param->info,
+#endif
+                          current_ev, end_buf, &iwe, (char*)cie->ie_wsc);
         }
         param->bytes_needed += data_len;
     }
@@ -1208,28 +1228,10 @@ ar6000_ioctl_siwgenie(struct net_device *dev,
 {
     AR_SOFTC_T *ar = (AR_SOFTC_T *)ar6k_priv(dev);
 
-#ifdef WAPI_ENABLE
-    A_UINT8    *ie = erq->pointer;
-    A_UINT8    ie_type = ie[0];
-    A_UINT16   ie_length = erq->length;
-    A_UINT8    wapi_ie[128];
-#endif
 
     if (ar->arWmiReady == FALSE) {
         return -EIO;
     }
-#ifdef WAPI_ENABLE
-    if (ie_type == IEEE80211_ELEMID_WAPI) {
-        if (ie_length > 0) {
-            if (copy_from_user(wapi_ie, ie, ie_length)) {
-                return -EIO;
-            }
-        }
-        wmi_set_appie_cmd(ar->arWmi, WMI_FRAME_ASSOC_REQ, ie_length, wapi_ie);
-    } else if (ie_length == 0) {
-        wmi_set_appie_cmd(ar->arWmi, WMI_FRAME_ASSOC_REQ, ie_length, wapi_ie);
-    }
-#endif
     return 0;
 }
 
@@ -1401,11 +1403,6 @@ ar6000_ioctl_siwauth(struct net_device *dev,
                 ar->arGroupCryptoLen = 0;
             }
             break;
-#ifdef WAPI_ENABLE
-        case IW_AUTH_WAPI_ENABLED:
-            ar->arWapiEnable = value;
-            break;
-#endif
         default:
            ret = -1;
            profChanged    = FALSE;
@@ -1539,11 +1536,6 @@ ar6000_ioctl_giwauth(struct net_device *dev,
                 data->value = 1;
             }
             break;
-#ifdef WAPI_ENABLE
-        case IW_AUTH_WAPI_ENABLED:
-            data->value = ar->arWapiEnable;
-            break;
-#endif
         default:
            ret = -1;
            break;
@@ -1597,67 +1589,6 @@ ar6000_ioctl_siwpmksa(struct net_device *dev,
     return ret;
 }
 
-#ifdef WAPI_ENABLE
-
-#define PN_INIT 0x5c365c36
-
-static int ar6000_set_wapi_key(struct net_device *dev,
-              struct iw_request_info *info,
-              struct iw_point *erq, char *extra)
-{
-    AR_SOFTC_T *ar = (AR_SOFTC_T *)ar6k_priv(dev);
-    struct iw_encode_ext *ext = (struct iw_encode_ext *)extra;
-    KEY_USAGE   keyUsage = 0;
-    A_INT32     keyLen;
-    A_UINT8     *keyData;
-    A_INT32     index;
-    A_UINT32    *PN;
-    A_INT32     i;
-    A_STATUS    status;
-    A_UINT8     wapiKeyRsc[16];
-    CRYPTO_TYPE keyType = WAPI_CRYPT;
-    const A_UINT8 broadcastMac[] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
-
-    index = erq->flags & IW_ENCODE_INDEX;
-    if (index && (((index - 1) < WMI_MIN_KEY_INDEX) ||
-                ((index - 1) > WMI_MAX_KEY_INDEX))) {
-        return -EIO;
-    }
-
-    index--;
-    if (index < 0 || index > 4) {
-        return -EIO;
-    }
-    keyData = (A_UINT8 *)(ext + 1);
-    keyLen = erq->length - sizeof(struct iw_encode_ext);
-    A_MEMCPY(wapiKeyRsc, ext->tx_seq, sizeof(wapiKeyRsc));
-
-    if (A_MEMCMP(ext->addr.sa_data, broadcastMac, sizeof(broadcastMac)) == 0) {
-        keyUsage |= GROUP_USAGE;
-        PN = (A_UINT32 *)wapiKeyRsc;
-        for (i = 0; i < 4; i++) {
-            PN[i] = PN_INIT;
-        }
-    } else {
-        keyUsage |= PAIRWISE_USAGE;
-    }
-    status = wmi_addKey_cmd(ar->arWmi,
-                            index,
-                            keyType,
-                            keyUsage,
-                            keyLen,
-                            wapiKeyRsc,
-                            keyData,
-                            KEY_OP_INIT_WAPIPN,
-                            NULL,
-                            SYNC_BEFORE_WMIFLAG);
-    if (A_OK != status) {
-        return -EIO;
-    }
-    return 0;
-}
-
-#endif
 
 /*
  * SIOCSIWENCODEEXT
@@ -1769,14 +1700,6 @@ ar6000_ioctl_siwencodeext(struct net_device *dev,
                 ik.ik_type = IEEE80211_CIPHER_AES_CCM;
 #endif /* USER_KEYS */
                 break;
-#ifdef WAPI_ENABLE
-            case IW_ENCODE_ALG_SM4:
-                if (ar->arWapiEnable) {
-                    return ar6000_set_wapi_key(dev, info, erq, extra);
-                } else {
-                    return -EIO;
-                }
-#endif
             case IW_ENCODE_ALG_PMK:
                 ar->arConnectCtrlFlags |= CONNECT_DO_WPA_OFFLOAD;
                 return wmi_set_pmk_cmd(ar->arWmi, keyData);
@@ -1957,7 +1880,7 @@ ar6000_ioctl_giwname(struct net_device *dev,
         strncpy(name, "AR6000 802.11ng", IFNAMSIZ);
         break;
     case (WMI_11NAG_CAPABILITY):
-        strncpy(name, "AR6K 802.11nag", IFNAMSIZ);
+        strncpy(name, "AR6000 802.11nag", IFNAMSIZ);
         break;
     default:
         strncpy(name, "AR6000 802.11b", IFNAMSIZ);
@@ -2304,39 +2227,6 @@ ar6000_ioctl_giwrange(struct net_device *dev,
     return ret;
 }
 
-/*
- * SIOCSIWPRIV
- *
- */
-int
-ar6000_ioctl_siwpriv(struct net_device *dev,
-              struct iw_request_info *info,
-              struct iw_point *data, char *extra)
-{
-    int ret = -EOPNOTSUPP;
-    AR_SOFTC_T *ar = (AR_SOFTC_T *)ar6k_priv(dev);
-#ifdef ANDROID_ENV
-    extern int android_ioctl_siwpriv(struct net_device *, struct iw_request_info *, struct iw_point *, char*);
-#endif
-
-    if (!ar || 
-            ( (!ar->arWmiReady || (ar->arWlanState != WLAN_ENABLED))
-#ifdef ANDROID_ENV
-            && (!data->pointer || strcasecmp((char*)data->pointer, "START")!=0)
-#endif
-            )
-        ) {
-        return -EIO;
-    }
-
-#ifdef ANDROID_ENV
-    ret = android_ioctl_siwpriv(dev, info, data, extra);
-    if (ret!=-EOPNOTSUPP) {
-        return ret;
-    }
-#endif
-    return ret;
-}
 
 /*
  * SIOCSIWAP
@@ -2406,7 +2296,7 @@ ar6000_ioctl_giwap(struct net_device *dev,
     return 0;
 }
 
-#if (WIRELESS_EXT >= 18)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,13)
 /*
  * SIOCSIWMLME
  */
@@ -2483,7 +2373,7 @@ ar6000_ioctl_siwmlme(struct net_device *dev,
     up(&ar->arSem);
     return 0;
 }
-#endif /* WIRELESS_EXT >= 18 */
+#endif /* LINUX_VERSION_CODE */
 
 /*
  * SIOCGIWAPLIST
@@ -2522,6 +2412,13 @@ ar6000_ioctl_siwscan(struct net_device *dev,
     if (ar->arWlanState == WLAN_DISABLED) {
         return -EIO;
     }
+
+/* NCHENG */
+    if (ar->arSkipAllScanReq == 1) {
+        printk("*** %s: skip scan request!!!\n", __func__);
+        return 0;
+    }
+/* NCHENG */
 
     /* If scan is issued in the middle of ongoing scan or connect,
        dont issue another one */
@@ -2709,7 +2606,7 @@ static const iw_handler ath_handlers[] = {
     (iw_handler) ar6000_ioctl_giwsens,          /* SIOCGIWSENS */
     (iw_handler) NULL /* not _used */,          /* SIOCSIWRANGE */
     (iw_handler) W_PROTO(ar6000_ioctl_giwrange),/* SIOCGIWRANGE */
-    (iw_handler) ar6000_ioctl_siwpriv,          /* SIOCSIWPRIV */
+    (iw_handler) NULL /* not used */,           /* SIOCSIWPRIV */
     (iw_handler) NULL /* kernel code */,        /* SIOCGIWPRIV */
     (iw_handler) NULL /* not used */,           /* SIOCSIWSTATS */
     (iw_handler) NULL /* kernel code */,        /* SIOCGIWSTATS */
@@ -2719,11 +2616,11 @@ static const iw_handler ath_handlers[] = {
     (iw_handler) NULL,                          /* SIOCGIWTHRSPY */
     (iw_handler) ar6000_ioctl_siwap,            /* SIOCSIWAP */
     (iw_handler) ar6000_ioctl_giwap,            /* SIOCGIWAP */
-#if (WIRELESS_EXT >= 18)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,13)
     (iw_handler) ar6000_ioctl_siwmlme,          /* SIOCSIWMLME */
 #else
     (iw_handler) NULL,                          /* -- hole -- */
-#endif  /* WIRELESS_EXT >= 18 */
+#endif  /* LINUX_VERSION_CODE */
     (iw_handler) ar6000_ioctl_iwaplist,         /* SIOCGIWAPLIST */
     (iw_handler) ar6000_ioctl_siwscan,          /* SIOCSIWSCAN */
     (iw_handler) ar6000_ioctl_giwscan,          /* SIOCGIWSCAN */

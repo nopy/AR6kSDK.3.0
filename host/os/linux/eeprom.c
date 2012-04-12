@@ -67,22 +67,24 @@ wmic_ether_aton(const char *orig, A_UINT8 *eth)
   i = 0;
   for(bufp = orig; *bufp != '\0'; ++bufp) {
     unsigned int val;
-	int h, l;
+    unsigned char c = *bufp++;
+    if (c >= '0' && c <= '9') val = c - '0';
+    else if (c >= 'a' && c <= 'f') val = c - 'a' + 10;
+    else if (c >= 'A' && c <= 'F') val = c - 'A' + 10;
+    else {
+        printk("%s: MAC value is invalid\n", __FUNCTION__);
+        break;
+    }
 
-	h = hex_to_bin(*bufp++);
-
-	if (h < 0) {
-		printk("%s: MAC value is invalid\n", __FUNCTION__);
-		break;
-	}
-
-	l = hex_to_bin(*bufp++);
-	if (l < 0) {
-		printk("%s: MAC value is invalid\n", __FUNCTION__);
-		break;
-	}
-
-	val = (h << 4) | l;
+    val <<= 4;
+    c = *bufp++;
+    if (c >= '0' && c <= '9') val |= c - '0';
+    else if (c >= 'a' && c <= 'f') val |= c - 'a' + 10;
+    else if (c >= 'A' && c <= 'F') val |= c - 'A' + 10;
+    else {
+        printk("%s: MAC value is invalid\n", __FUNCTION__);
+        break;
+    }
 
     eth[i] = (unsigned char) (val & 0377);
     if(++i == ATH_MAC_LEN) {
@@ -396,7 +398,12 @@ void eeprom_ar6000_transfer(HIF_DEVICE *device, char *fake_file, char *p_mac)
             return;
         }
 
-        inode = GET_INODE_FROM_FILEP(filep);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,20)
+    	inode = filp->f_path.dentry->d_inode;
+#else
+    	inode = filp->f_dentry->d_inode;
+#endif
+
         if (!inode) {
             printk("%s: Get inode from filp failed\n", __FUNCTION__);
             filp_close(filp, NULL);
@@ -475,7 +482,11 @@ void eeprom_ar6000_transfer(HIF_DEVICE *device, char *fake_file, char *p_mac)
             return;
         }
         
-        inode = GET_INODE_FROM_FILEP(filep);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,20)
+    	inode = filp->f_path.dentry->d_inode;
+#else
+    	inode = filp->f_dentry->d_inode;
+#endif
         if (!inode) {
             printk("%s: Get inode from filp failed\n", __FUNCTION__);
             filp_close(filp, NULL);

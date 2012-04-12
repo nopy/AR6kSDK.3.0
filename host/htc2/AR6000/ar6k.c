@@ -431,7 +431,7 @@ static A_STATUS DevDoEnableDisableRecvNormal(AR6K_DEVICE *pDev, A_BOOL EnableRec
             pIOPacket->pContext = pDev;
 
                 /* write it out asynchronously */
-            status = HIFReadWrite(pDev->HIFDevice,
+            HIFReadWrite(pDev->HIFDevice,
                          INT_STATUS_ENABLE_ADDRESS,
                          pIOPacket->pBuffer,
                          AR6K_IRQ_ENABLE_REGS_SIZE,

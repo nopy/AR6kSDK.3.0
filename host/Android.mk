@@ -18,6 +18,7 @@
 #==============================================================================
 
 ifneq ($(TARGET_SIMULATOR),true)
+ifeq ($(TARGET_AR6K_VERSION), 3.0)
 
 LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
@@ -87,4 +88,5 @@ $(mod_file) : $(mod_cleanup) $(INSTALLED_KERNEL_TARGET)  $(ACP)
 #$(TARGET_OUT)/wifi/ar6000.ko
 include $(LOCAL_PATH)/tools/Android.mk
 
+endif
 endif

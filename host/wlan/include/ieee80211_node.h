@@ -76,6 +76,6 @@ struct ieee80211_node_table {
 
 #define WLAN_NODE_INACT_TIMEOUT_MSEC            120000
    
-#define WLAN_NODE_INACT_CNT            4
+#define WLAN_NODE_INACT_CNT            6
 
 #endif /* _IEEE80211_NODE_H_ */

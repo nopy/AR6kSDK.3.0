@@ -2,15 +2,19 @@
 /* <copyright file="dbglog_id.h" company="Atheros"> */
 /*    Copyright (c) 2004-2010 Atheros Corporation.  All rights reserved. */
 /*  */
-/* This program is free software; you can redistribute it and/or modify */
-/* it under the terms of the GNU General Public License version 2 as */
-/* published by the Free Software Foundation; */
-/* */
-/* Software distributed under the License is distributed on an "AS */
-/* IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or */
-/* implied. See the License for the specific language governing */
-/* rights and limitations under the License. */
-/* */
+/* The software source and binaries included in this development package are */
+/* licensed, not sold. You, or your company, received the package under one */
+/* or more license agreements. The rights granted to you are specifically */
+/* listed in these license agreement(s). All other rights remain with Atheros */
+/* Communications, Inc., its subsidiaries, or the respective owner including */
+/* those listed on the included copyright notices.  Distribution of any */
+/* portion of this package must be in strict compliance with the license */
+/* agreement(s) terms. */
+/* </copyright> */
+/*  */
+/* <summary> */
+/* 	Wifi driver for AR6002 */
+/* </summary> */
 /* */
 /*------------------------------------------------------------------------------ */
 /*============================================================================== */
@@ -108,6 +112,18 @@ extern "C" {
 #define TLPM_WAKEUP_FROM_BT                          15 
 #define TLPM_TX_BREAK_RECIVED                        16
 #define TLPM_IDLE_TIMER_NOT_RUNNING                  17
+#define	WAC_ENABLE                                   18
+#define WAC_SCAN_DONE                                19
+#define WAC_REPORT_BSS                               20
+#define WAC_START_WPS                                21
+#define WAC_SCAN_REPLY                               22
+#define WAC_UPDATE_BSS                               23
+#define WAC_PIN_STATUS                               24
+#define WAC_PIN_STATUS_REJECT                        25
+#define WAC_RSSI_BELOW_THRESHOLD                     26
+#define WAC_CTRL_REQ_CMD                             27
+#define WAC_CTRL_REQ_REPLY                           28
+#define DV_SET_ANTENNA                               29
 #define MISC_DBGID_DEFINITION_END
     
 /* TXRX debug identifier definitions */
@@ -290,7 +306,8 @@ extern "C" {
 #define DC_BEACON_UPDATE_COMPLETE                  21
 #define DC_END_SEARCH_BEACON_UPDATE_COMP_CB        22
 #define DC_BSSINFO_EVENT_DROPPED                   23
-#define DC_IEEEPS_ENABLED_BUT_ATIM_ABSENT          24 
+#define DC_IEEEPS_ENABLED_BUT_ATIM_ABSENT          24
+#define DC_CH_ATTRIB_UPDATED                       25 
 #define DC_DBGID_DEFINITION_END
 
 /* CO debug identifier definitions */
@@ -550,6 +567,19 @@ extern "C" {
 #define BTCOEX_DBG_A2DP_FORCE_SCAN                 186
 #define BTCOEX_DBG_DTIM_STOMP_COMP                 187
 #define BTCOEX_ACL_PRESENCE_TIMER                  188
+#define BTCOEX_DBG_QUEUE_SELF_CTS                  189
+#define BTCOEX_DBG_SELF_CTS_COMP                   190
+#define BTCOEX_DBG_APMODE_WAIT_FOR_CTS_COMP_FAILED 191
+#define BTCOEX_DBG_APMODE_A2DP_MED_TO_BT           192
+#define BTCOEX_DBG_APMODE_SET_BTSTATE              193
+#define BTCOEX_DBG_APMODE_A2DP_STATUS              194
+#define BTCOEX_DBG_APMODE_SCO_CTS_HANDLER          195
+#define BTCOEX_DBG_APMODE_SCO_STATUS               196
+#define BTCOEX_DBG_APMODE_TXQ_DRAINED              197
+#define BTCOEX_DBG_APMODE_SCO_ARM_TIMER            198
+#define BTCOEX_DBG_APMODE_SWITCH_MED_TO_WLAN       199
+#define BTCOEX_APMODE_BCN_TX_HANDLER               200
+#define BTCOEX_APMODE_BCN_TX                       201
 #define BTCOEX_DBGID_DEFINITION_END
 
 #ifdef __cplusplus

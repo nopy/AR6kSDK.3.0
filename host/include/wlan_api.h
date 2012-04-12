@@ -49,9 +49,6 @@ struct ieee80211_common_ie {
     A_UINT8     *ie_wsc;
     A_UINT8     *ie_htcap;
     A_UINT8     *ie_htop;
-#ifdef WAPI_ENABLE
-    A_UINT8     *ie_wapi;
-#endif
 };
 
 typedef struct bss {

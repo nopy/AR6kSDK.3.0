@@ -156,9 +156,7 @@ static INLINE A_STATUS HTCProcessTrailer(HTC_TARGET *target,
                     }
 #endif
                         /* just one normal lookahead */
-                    if (pNumLookAheads != NULL) {
-                        *pNumLookAheads = 1;
-                    }
+                    *pNumLookAheads = 1;
                 }
                 break;
             case HTC_RECORD_LOOKAHEAD_BUNDLE:

@@ -43,9 +43,6 @@
 
 #define IEEE80211_CRC_LEN           4
 
-#ifdef WAPI_ENABLE
-#define IEEE80211_WAPI_EXTIVLEN      10   /* extended IV length */
-#endif /* WAPI ENABLE */
 
 
 #define IEEE80211_ADDR_LEN  6       /* size of 802.11 address */
@@ -235,9 +232,6 @@ enum {
     IEEE80211_ELEMID_RSN        = 48,
     IEEE80211_ELEMID_XRATES     = 50,
     IEEE80211_ELEMID_HTINFO_ANA = 61,
-#ifdef WAPI_ENABLE
-    IEEE80211_ELEMID_WAPI       = 68,
-#endif
     IEEE80211_ELEMID_TPC        = 150,
     IEEE80211_ELEMID_CCKM       = 156,
     IEEE80211_ELEMID_VENDOR     = 221,  /* vendor private */

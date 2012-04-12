@@ -168,11 +168,6 @@ wlan_parse_beacon(A_UINT8 *buf, int framelen, struct ieee80211_common_ie *cie)
         case IEEE80211_ELEMID_HTINFO_ANA:
             cie->ie_htop = frm;
             break;
-#ifdef WAPI_ENABLE
-		case IEEE80211_ELEMID_WAPI:
-            cie->ie_wapi = frm;
-            break;
-#endif
         case IEEE80211_ELEMID_VENDOR:
             if (iswpaoui(frm)) {
                 cie->ie_wpa = frm;

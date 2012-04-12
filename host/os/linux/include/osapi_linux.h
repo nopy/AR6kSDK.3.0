@@ -42,7 +42,6 @@
 #include <asm/irq.h>
 #endif
 
-#include <linux/semaphore.h>
 #include <linux/cache.h>
 
 #ifdef __GNUC__
@@ -82,27 +81,9 @@
 #define A_MEMCPY(dst, src, len)         memcpy((A_UINT8 *)(dst), (src), (len))
 #define A_MEMZERO(addr, len)            memset(addr, 0, len)
 #define A_MEMCMP(addr1, addr2, len)     memcmp((addr1), (addr2), (len))
-
-#ifdef AR6K_ALLOC_DEBUG
-#define a_meminfo_add(p, s)  __a_meminfo_add(p, s, __func__, __LINE)
-void __a_meminfo_add(void *ptr, size_t msize, const char *func, int lineno);
-void  a_meminfo_del(void *ptr);
-void* a_mem_alloc(size_t msize, int type, const char *func, int lineno);
-void a_mem_free(void *ptr);
-void a_meminfo_report(int clear);
-#define A_MALLOC(size)                  a_mem_alloc((size), GFP_KERNEL, __func__, __LINE__)
-#define A_MALLOC_NOWAIT(size)           a_mem_alloc((size), GFP_ATOMIC, __func__, __LINE__)
-#define A_FREE(addr)                    a_mem_free(addr)
-#define A_NETIF_RX(skb)                 do { a_meminfo_del(skb);  netif_rx(skb); } while (0)
-#define A_NETIF_RX_NI(skb)              do { a_meminfo_del(skb);  netif_rx_ni(skb); } while (0)
-#else
-#define a_meminfo_report(_c)
 #define A_MALLOC(size)                  kmalloc((size), GFP_KERNEL)
 #define A_MALLOC_NOWAIT(size)           kmalloc((size), GFP_ATOMIC)
 #define A_FREE(addr)                    kfree(addr)
-#define A_NETIF_RX(skb)                 netif_rx(skb)
-#define A_NETIF_RX_NI(skb)              netif_rx_ni(skb)
-#endif
 
 #if defined(ANDROID_ENV) && defined(CONFIG_ANDROID_LOGGER)
 extern unsigned int enablelogcat;
@@ -273,17 +254,10 @@ typedef struct sk_buff_head A_NETBUF_QUEUE_T;
 /*
  * Network buffer support
  */
-#ifdef AR6K_ALLOC_DEBUG
-#define A_NETBUF_ALLOC(size) \
-    a_netbuf_alloc(size, __func__, __LINE__)
-#define A_NETBUF_ALLOC_RAW(size) \
-    a_netbuf_alloc_raw(size, __func__, __LINE__)
-#else
 #define A_NETBUF_ALLOC(size) \
     a_netbuf_alloc(size)
 #define A_NETBUF_ALLOC_RAW(size) \
     a_netbuf_alloc_raw(size)
-#endif /* AR6K_ALLOC_DEBUG */
 #define A_NETBUF_FREE(bufPtr) \
     a_netbuf_free(bufPtr)
 #define A_NETBUF_DATA(bufPtr) \
@@ -330,13 +304,8 @@ typedef struct sk_buff_head A_NETBUF_QUEUE_T;
 /*
  * OS specific network buffer access routines
  */
-#ifdef AR6K_ALLOC_DEBUG
-void *a_netbuf_alloc(int size, const char *func, int lineno);
-void *a_netbuf_alloc_raw(int size, const char *func, int lineno);
-#else
 void *a_netbuf_alloc(int size);
 void *a_netbuf_alloc_raw(int size);
-#endif
 void a_netbuf_free(void *bufPtr);
 void *a_netbuf_to_data(void *bufPtr);
 A_UINT32 a_netbuf_to_len(void *bufPtr);

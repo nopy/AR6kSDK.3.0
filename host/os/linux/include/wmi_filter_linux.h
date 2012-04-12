@@ -60,11 +60,11 @@ A_UINT8 sioctl_filter[] = {
 (0),                                            /* SIOCGIWTHRSPY   0x8B13   */
 (INFRA_NETWORK | ADHOC_NETWORK | AP_NETWORK),   /* SIOCSIWAP       0x8B14   */
 (INFRA_NETWORK | ADHOC_NETWORK | AP_NETWORK),   /* SIOCGIWAP       0x8B15   */
-#if (WIRELESS_EXT >= 18)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,13)
 (INFRA_NETWORK | ADHOC_NETWORK),                /* SIOCSIWMLME     0X8B16   */
 #else
 (0),                                            /* Dummy           0        */
-#endif /* WIRELESS_EXT */
+#endif /* LINUX_VERSION_CODE */
 (0),                                            /* SIOCGIWAPLIST   0x8B17   */
 (INFRA_NETWORK | ADHOC_NETWORK),                /* SIOCSIWSCAN     0x8B18   */
 (INFRA_NETWORK | ADHOC_NETWORK),                /* SIOCGIWSCAN     0x8B19   */
@@ -202,11 +202,11 @@ A_UINT8 xioctl_filter[] = {
 (0xFF),                                         /* AR6000_XIOCTL_WMI_SET_WSC_STATUS                70   */
 (INFRA_NETWORK | ADHOC_NETWORK),                /* AR6000_XIOCTL_WMI_SET_BT_STATUS                 71   */
 (INFRA_NETWORK | ADHOC_NETWORK),                /* AR6000_XIOCTL_WMI_SET_BT_PARAMS                 72   */
-(INFRA_NETWORK | ADHOC_NETWORK | AP_NETWORK),   /* AR6000_XIOCTL_WMI_SET_HOST_SLEEP_MODE           73   */
-(INFRA_NETWORK | ADHOC_NETWORK | AP_NETWORK),   /* AR6000_XIOCTL_WMI_SET_WOW_MODE                  74   */
-(INFRA_NETWORK | ADHOC_NETWORK | AP_NETWORK),   /* AR6000_XIOCTL_WMI_GET_WOW_LIST                  75   */
-(INFRA_NETWORK | ADHOC_NETWORK | AP_NETWORK),   /* AR6000_XIOCTL_WMI_ADD_WOW_PATTERN               76   */
-(INFRA_NETWORK | ADHOC_NETWORK | AP_NETWORK),   /* AR6000_XIOCTL_WMI_DEL_WOW_PATTERN               77   */
+(INFRA_NETWORK | ADHOC_NETWORK),                /* AR6000_XIOCTL_WMI_SET_HOST_SLEEP_MODE           73   */
+(INFRA_NETWORK | ADHOC_NETWORK),                /* AR6000_XIOCTL_WMI_SET_WOW_MODE                  74   */
+(INFRA_NETWORK | ADHOC_NETWORK),                /* AR6000_XIOCTL_WMI_GET_WOW_LIST                  75   */
+(INFRA_NETWORK | ADHOC_NETWORK),                /* AR6000_XIOCTL_WMI_ADD_WOW_PATTERN               76   */
+(INFRA_NETWORK | ADHOC_NETWORK),                /* AR6000_XIOCTL_WMI_DEL_WOW_PATTERN               77   */
 (0xFF),                                         /* AR6000_XIOCTL_TARGET_INFO                       78   */
 (0xFF),                                         /* AR6000_XIOCTL_DUMP_HTC_CREDIT_STATE             79   */
 (0xFF),                                         /* AR6000_XIOCTL_TRAFFIC_ACTIVITY_CHANGE           80   */

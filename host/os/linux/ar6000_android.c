@@ -20,13 +20,12 @@
 #include "htc.h"
 #include <linux/vmalloc.h>
 #include <linux/fs.h>
-
+#include <linux/time.h>
+#include <linux/hardirq.h>
 #ifdef CONFIG_HAS_WAKELOCK
 #include <linux/wakelock.h>
 #endif
-#ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
-#endif
 
 A_BOOL enable_mmc_host_detect_change = 0;
 static void ar6000_enable_mmchost_detect_change(int enable);
@@ -41,12 +40,10 @@ unsigned int enablelogcat;
 extern int bmienable;
 extern struct net_device *ar6000_devices[];
 extern char ifname[];
-
-#ifdef CONFIG_HAS_WAKELOCK
 extern struct wake_lock ar6k_wow_wake_lock;
-struct wake_lock ar6k_init_wake_lock;
-#endif
 
+extern int wificheck;
+extern int resumecheck;
 const char def_ifname[] = "wlan0";
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 module_param_string(fwpath, fwpath, sizeof(fwpath), 0644);
@@ -58,14 +55,12 @@ module_param(wowledon, int, 0644);
 MODULE_PARAM(wowledon,"i");
 #endif 
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
+struct wake_lock ar6k_init_wake_lock;
 static int screen_is_off;
 static struct early_suspend ar6k_early_suspend;
-#endif
-
 static A_STATUS (*ar6000_avail_ev_p)(void *, void *);
 
-#if defined(CONFIG_ANDROID_LOGGER) && (!defined(CONFIG_MMC_MSM) || LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,32))
+#if !defined(CONFIG_MMC_MSM) || LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,32)
 int logger_write(const enum logidx index,
                 const unsigned char prio,
                 const char __kernel * const tag,
@@ -186,9 +181,12 @@ static int android_readwrite_file(const A_CHAR *filename, A_CHAR *rbuf, const A_
         if (length==0) {
             /* Read the length of the file only */
             struct inode    *inode;
-
-            inode = GET_INODE_FROM_FILEP(filp);
-            if (!inode) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,20)
+            inode = filp->f_path.dentry->d_inode;
+#else
+            inode = filp->f_dentry->d_inode;
+#endif
+		    if (!inode) {
                 AR_DEBUG_PRINTF(ATH_DEBUG_ERR, ("%s: Get inode from %s failed\n", __FUNCTION__, filename));
                 ret = -ENOENT;
                 break;
@@ -227,16 +225,10 @@ int android_request_firmware(const struct firmware **firmware_p, const char *nam
     struct firmware *firmware;
     char filename[256];
     const char *raw_filename = name;
-	*firmware_p = firmware = A_MALLOC(sizeof(*firmware));
+	*firmware_p = firmware = kzalloc(sizeof(*firmware), GFP_KERNEL);
     if (!firmware) 
 		return -ENOMEM;
-    A_MEMZERO(firmware, sizeof(*firmware));
 	sprintf(filename, "%s/%s", fwpath, raw_filename);
-#ifdef TARGET_EUROPA
-    if (strcmp(raw_filename, "softmac")==0) {
-        sprintf(filename, "/data/.nvmac.info");
-    }
-#endif /* TARGET_EUROPA */
     do {
         size_t length, bufsize, bmisize;
 
@@ -269,7 +261,7 @@ int android_request_firmware(const struct firmware **firmware_p, const char *nam
         if (firmware) {
             if (firmware->data)
                 vfree(firmware->data);
-            A_FREE(firmware);
+            kfree(firmware);
         }
         *firmware_p = NULL;
     } else {
@@ -283,258 +275,25 @@ void android_release_firmware(const struct firmware *firmware)
 	if (firmware) {
         if (firmware->data)
             vfree(firmware->data);
-        A_FREE((struct firmware *)firmware);
+        kfree(firmware);
     }
 }
 
 static A_STATUS ar6000_android_avail_ev(void *context, void *hif_handle)
 {
     A_STATUS ret;    
-#ifdef CONFIG_HAS_WAKELOCK
     wake_lock(&ar6k_init_wake_lock);
-#endif
     ar6000_enable_mmchost_detect_change(0);
     ret = ar6000_avail_ev_p(context, hif_handle);
-#ifdef CONFIG_HAS_WAKELOCK
     wake_unlock(&ar6k_init_wake_lock);
-#endif
     return ret;
-}
-
-static int android_do_ioctl_direct(struct net_device *dev, int cmd, struct ifreq *ifr, void *data)
-{
-    int ret = -EIO;
-    int  (*do_ioctl)(struct net_device *, struct ifreq *, int);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,29)    
-    do_ioctl =  dev->do_ioctl;
-#else   
-    do_ioctl = dev->netdev_ops->ndo_do_ioctl;
-#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(2,6,29) */
-
-    ifr->ifr_ifru.ifru_data = (__force void __user *)data;
-    
-    if (do_ioctl) {
-        mm_segment_t oldfs = get_fs();
-        set_fs(KERNEL_DS);
-        ret = do_ioctl(dev, ifr, cmd);
-        set_fs(oldfs);
-    }
-    return ret;
-}
-
-int android_ioctl_siwpriv(struct net_device *dev,
-              struct iw_request_info *__info,
-              struct iw_point *data, char *__extra)
-{
-    char *cmd = data->pointer;
-    char *buf = data->pointer;
-    AR_SOFTC_T *ar = (AR_SOFTC_T *)ar6k_priv(dev);
-
-    if (!cmd || !buf) {
-        return -EOPNOTSUPP;
-    }
-    if (strcasecmp(cmd, "RSSI")==0 || strcasecmp(cmd, "RSSI-APPROX") == 0) {
-        int rssi = 255;
-        struct iw_statistics *iwStats;
-        struct iw_statistics* (*get_iwstats)(struct net_device *);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)
-        get_iwstats = dev->get_wireless_stats;
-#else
-        get_iwstats = dev->wireless_handlers->get_wireless_stats;
-#endif
-        iwStats = get_iwstats(dev);
-        if (iwStats) {
-            rssi = iwStats->qual.qual;          
-            if (rssi == 255)
-                rssi = -200;
-            else
-                rssi += (161 - 256);                
-        }
-        return snprintf(buf, data->length, "SSID rssi %d\n", rssi);               
-    } else if (strcasecmp(cmd, "LINKSPEED")==0) {
-        int iocmd = SIOCGIWRATE - SIOCSIWCOMMIT;
-        const iw_handler getRate = dev->wireless_handlers->standard[iocmd];
-        if (getRate) {
-            union iwreq_data miwr;
-            struct iw_request_info minfo;
-            A_MEMZERO(&minfo, sizeof(minfo));
-            A_MEMZERO(&miwr, sizeof(miwr));
-            minfo.cmd = SIOCGIWRATE;
-            if (getRate(dev, &minfo, &miwr, NULL) == 0) {
-                unsigned int speed_kbps = miwr.param.value / 1000000;
-                if ((!miwr.param.fixed)) {
-                    return snprintf(buf, data->length, "LinkSpeed %u\n", speed_kbps);
-                }
-            }
-        }
-        return -1;
-    } else if (strcasecmp(cmd, "MACADDR")==0) {
-        /* reply comes back in the form "Macaddr = XX.XX.XX.XX.XX.XX" where XX */
-        A_UCHAR *mac = dev->dev_addr;
-        return snprintf(buf, data->length, "Macaddr = %02X:%02X:%02X:%02X:%02X:%02X\n",
-                        mac[0], mac[1], mac[2],
-                        mac[3], mac[4], mac[5]);
-    } else if (strcasecmp(cmd, "SCAN-ACTIVE")==0) {
-        return 0; /* unsupport function. Suppress the error */
-    } else if (strcasecmp(cmd, "SCAN-PASSIVE")==0) {
-        return 0; /* unsupport function. Suppress the error */
-    } else if (strcasecmp(cmd, "START")==0 || strcasecmp(cmd, "STOP")==0) {
-        struct ifreq ifr;
-        char userBuf[16];
-        int ex_arg = (strcasecmp(cmd, "START")==0) ? WLAN_ENABLED : WLAN_DISABLED;
-
-        A_MEMZERO(userBuf, sizeof(userBuf));
-        ((int *)userBuf)[0] = AR6000_XIOCTRL_WMI_SET_WLAN_STATE;
-        ((int *)userBuf)[1] = ex_arg;
-        return android_do_ioctl_direct(dev, AR6000_IOCTL_EXTENDED, &ifr, userBuf);
-    } else if (strncasecmp(cmd, "POWERMODE ", 10)==0) {
-        int mode;
-        if (sscanf(cmd, "%*s %d", &mode) == 1) {
-            int iocmd = SIOCSIWPOWER - SIOCSIWCOMMIT;
-            iw_handler setPower = dev->wireless_handlers->standard[iocmd];
-            if (setPower) {
-                union iwreq_data miwr;
-                struct iw_request_info minfo;
-                A_MEMZERO(&minfo, sizeof(minfo));
-                A_MEMZERO(&miwr, sizeof(miwr));
-                minfo.cmd = SIOCSIWPOWER;
-                if (mode == 0 /* auto */)
-                    miwr.power.disabled = 0;
-                else if (mode == 1 /* active */)
-                    miwr.power.disabled = 1;
-                else
-                    return -1;
-                return setPower(dev, &minfo, &miwr, NULL);
-            }
-        }
-        return -1;
-    } else if (strcasecmp(cmd, "SCAN-CHANNELS")==0) {
-        /* reply comes back in the form "Scan-Channels = X" where X is the number of channels         */
-        int iocmd = SIOCGIWRANGE - SIOCSIWCOMMIT;
-        iw_handler getRange = dev->wireless_handlers->standard[iocmd];            
-        if (getRange) {
-            union iwreq_data miwr;
-            struct iw_request_info minfo;
-            struct iw_range range;
-            A_MEMZERO(&minfo, sizeof(minfo));
-            A_MEMZERO(&miwr, sizeof(miwr));
-            A_MEMZERO(&range, sizeof(range));
-            minfo.cmd = SIOCGIWRANGE;
-            miwr.data.pointer = (caddr_t) &range;
-            miwr.data.length = sizeof(range);
-            getRange(dev, &minfo, &miwr, (char*)&range);
-        }
-        if (ar->arNumChannels!=-1) {
-            return snprintf(buf, data->length, "Scan-Channels = %d\n", ar->arNumChannels);
-        }
-        return -1;
-    } else if (strncasecmp(cmd, "SCAN-CHANNELS ", 14)==0 || 
-               strncasecmp(cmd, "COUNTRY ", 8)==0) {
-        /* 
-         * Set the available channels with WMI_SET_CHANNELPARAMS cmd
-         * However, the channels will be limited by the eeprom regulator domain
-         * Try to use a regulator domain which will not limited the channels range.
-         */
-        int i;
-        int chan = 0;
-        A_UINT16 *clist;
-        struct ifreq ifr; 
-        char ioBuf[256];
-        WMI_CHANNEL_PARAMS_CMD *chParamCmd = (WMI_CHANNEL_PARAMS_CMD *)ioBuf;
-        if (strncasecmp(cmd, "COUNTRY ", 8)==0) {
-            char *country = cmd + 8;
-            if (strcasecmp(country, "US")==0) {
-                chan = 11;
-            } else if (strcasecmp(country, "JP")==0) {
-                chan = 14;
-            } else if (strcasecmp(country, "EU")==0) {
-                chan = 13;
-            }
-        } else if (sscanf(cmd, "%*s %d", &chan) != 1) {
-            return -1;
-        }
-        if ( (chan != 11) && (chan != 13) && (chan != 14)) {
-            return -1;
-        }
-        if (ar->arNextMode == AP_NETWORK) {
-            return -1;
-        }
-        A_MEMZERO(&ifr, sizeof(ifr));
-        A_MEMZERO(ioBuf, sizeof(ioBuf));
-
-        chParamCmd->phyMode = WMI_11G_MODE;
-        clist = chParamCmd->channelList;
-        chParamCmd->numChannels = chan;
-        chParamCmd->scanParam = 1;        
-        for (i = 0; i < chan; i++) {
-            clist[i] = wlan_ieee2freq(i + 1);
-        }
-        
-        return android_do_ioctl_direct(dev, AR6000_IOCTL_WMI_SET_CHANNELPARAMS, &ifr, ioBuf);
-    } else if (strncasecmp(cmd, "BTCOEXMODE ", 11)==0) {
-        int mode;
-        if (sscanf(cmd, "%*s %d", &mode)==1) {
-            /* 
-            * Android disable BT-COEX when obtaining dhcp packet except there is headset is connected 
-             * It enable the BT-COEX after dhcp process is finished
-             * We ignore since we have our way to do bt-coex during dhcp obtaining.
-             */
-            switch (mode) {
-            case 1: /* Disable*/
-                break;
-            case 0: /* Enable */
-                /* fall through */
-            case 2: /* Sense*/
-                /* fall through */
-            default:
-                break;
-            }
-            return 0; /* ignore it */
-        }
-        return -1;
-    } else if (strcasecmp(cmd, "BTCOEXSCAN-START")==0) {
-        /* Android enable or disable Bluetooth coexistence scan mode. When this mode is on,
-         * some of the low-level scan parameters used by the driver are changed to
-         * reduce interference with A2DP streaming.
-         */
-        return 0; /* ignore it since we have btfilter  */
-    } else if (strcasecmp(cmd, "BTCOEXSCAN-STOP")==0) {
-        return 0; /* ignore it since we have btfilter  */
-    } else if (strncasecmp(cmd, "RXFILTER-ADD ", 13)==0) {
-        return 0; /* ignore it */
-    } else if (strncasecmp(cmd, "RXFILTER-REMOVE ", 16)==0) {
-        return 0; /* ignoret it */
-    } else if (strcasecmp(cmd, "RXFILTER-START")==0 || strcasecmp(cmd, "RXFILTER-STOP")==0) {
-        unsigned int flags = dev->flags;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
-        int mc_count = dev->mc_count;   
-#else
-        int mc_count = netdev_mc_count(dev);
-#endif           
-        if (!(flags & IFF_UP)) {
-            return -1;
-        }
-        if (strcasecmp(cmd, "RXFILTER-START")==0) {
-            if (mc_count > 0 || (flags & IFF_MULTICAST) ) {
-                flags &= ~IFF_MULTICAST;
-            }
-        } else {
-            flags |= IFF_MULTICAST;
-        }
-        if (flags != dev->flags) {
-            dev_change_flags(dev, flags);
-        }
-        return 0;
-    }
-
-    return -EOPNOTSUPP;
 }
 
 /* Useful for qualcom platform to detect our wlan card for mmc stack */
 static void ar6000_enable_mmchost_detect_change(int enable)
 {
 #ifdef CONFIG_MMC_MSM
-#define MMC_MSM_DEV "msm_sdcc.2"
+#define MMC_MSM_DEV "msm_sdcc.1"
     char buf[3];
     int length;
 
@@ -550,15 +309,115 @@ static void ar6000_enable_mmchost_detect_change(int enable)
 #endif
 }
 
+/* NCHENG */
+extern AR_SOFTC_T *g_ar;
+/* NCHENG */
+
 #ifdef CONFIG_HAS_EARLYSUSPEND
+int hidp_del_all_connection(void) 
+{
+	return 0;
+}  /*/ Abon [START] - Add : For HID suspend/resume issue (201009081636) */
 static void android_early_suspend(struct early_suspend *h)
 {
+/* NCHENG */
+#if 0
     screen_is_off = 1;
+#else
+    if( wificheck == 0 )
+        return;
+{
+    AR_SOFTC_T *ar = g_ar;
+
+    /*/ Abon [START] - Add : For HID suspend/resume issue (201009081636) */
+    extern unsigned int setuphci;	/*/ Abon - Add : Determine if Combo or single WIFI module (201009082101) */
+    if (setuphci) {
+        hidp_del_all_connection();
+    }
+    /*/ Abon [END] - Add : For HID suspend/resume issue (201009081636) */
+
+    screen_is_off = 1;
+
+    if (ar->arWlanState != WLAN_ENABLED || ar->arWmiReady != TRUE) {
+        printk("*** %s: -, WLAN is off\n", __func__);
+        return;
+    }
+
+    ar->arSkipAllScanReq = 1;
+    ar->scan_triggered = 0;
+
+    if (wmi_scanparams_cmd(ar->arWmi, 0xFFFF, 0, 0xFFFF, 0, 0, 0, 0, 0, 0, 0) != A_OK) {
+        printk("*** %s: failed to disable background scan\n", __func__);
+    }
+
+    if (wmi_listeninterval_cmd(ar->arWmi, 300, 0) != A_OK) {
+        printk("*** %s: failed to change listen interval\n", __func__);
+    }
+}
+#endif
+/* NCHENG */
 }
 
 static void android_late_resume(struct early_suspend *h)
 {
+/* NCHENG */
+#if 0
     screen_is_off = 0;
+#else
+{
+    int i;
+
+    if( wificheck == 0 )
+        return;
+    for(i=0;i<50;i++) {
+        if( resumecheck == 1 )
+            break;
+        else
+            msleep(100);
+    }
+    if( resumecheck == 0 )
+        return;
+}
+
+{
+    AR_SOFTC_T *ar = g_ar;
+    A_UINT16 fg_start_period = (ar->scParams.fg_start_period == 0)?
+                      1: ar->scParams.fg_start_period;
+
+    screen_is_off = 0;
+    ar->arSkipAllScanReq = 0;
+
+    if (ar->arWlanState != WLAN_ENABLED) {
+        printk("*** %s: -, WLAN is off\n", __func__);
+        return;
+    }
+
+    if (wmi_listeninterval_cmd(
+                ar->arWmi,
+                ar->arListenIntervalT,
+                ar->arListenIntervalB) != A_OK)
+    {
+        printk("*** %s: failed to get back to the normal listen interval\n", __func__);
+    }
+    ar->scParams.minact_chdwell_time = 0;
+    ar->scParams.maxact_chdwell_time = 105;
+    if ((wmi_scanparams_cmd(
+                ar->arWmi, fg_start_period,
+                ar->scParams.fg_end_period,
+                ar->scParams.bg_period,
+                ar->scParams.minact_chdwell_time,
+                ar->scParams.maxact_chdwell_time,
+                ar->scParams.pas_chdwell_time,
+                ar->scParams.shortScanRatio,
+                ar->scParams.scanCtrlFlags,
+                ar->scParams.max_dfsch_act_time,
+                ar->scParams.maxact_scan_per_ssid)) != A_OK)
+    {
+        printk("*** %s: failed to enable background scan\n", __func__);
+    }
+}
+#endif
+/* NCHENG */
 }
 #endif
 
@@ -569,9 +428,9 @@ void android_module_init(OSDRV_CALLBACKS *osdrvCallbacks)
     if (ifname[0] == '\0')
         strcpy(ifname, def_ifname);
 #endif 
-#ifdef CONFIG_HAS_WAKELOCK
+
     wake_lock_init(&ar6k_init_wake_lock, WAKE_LOCK_SUSPEND, "ar6k_init");
-#endif
+
 #ifdef CONFIG_HAS_EARLYSUSPEND
     ar6k_early_suspend.suspend = android_early_suspend;
     ar6k_early_suspend.resume  = android_late_resume;
@@ -590,20 +449,15 @@ void android_module_exit(void)
 #ifdef CONFIG_HAS_EARLYSUSPEND
     unregister_early_suspend(&ar6k_early_suspend);
 #endif
-#ifdef CONFIG_HAS_WAKELOCK
     wake_lock_destroy(&ar6k_init_wake_lock);
-#endif
+
     ar6000_enable_mmchost_detect_change(1);
 }
 
 #ifdef CONFIG_PM
 void android_ar6k_check_wow_status(AR_SOFTC_T *ar, struct sk_buff *skb, A_BOOL isEvent)
 {
-    if (
-#ifdef CONFIG_HAS_EARLYSUSPEND
-        screen_is_off && 
-#endif 
-            skb && ar->arConnected) {
+    if (screen_is_off && skb && ar->arConnected) {
         A_BOOL needWake = FALSE;
         if (isEvent) {
             if (A_NETBUF_LEN(skb) >= sizeof(A_UINT16)) {
@@ -626,34 +480,9 @@ void android_ar6k_check_wow_status(AR_SOFTC_T *ar, struct sk_buff *skb, A_BOOL i
                 case 0x888e: /* EAPOL */
                 case 0x88c7: /* RSN_PREAUTH */
                 case 0x88b4: /* WAPI */
-                    needWake = TRUE;
-                    break;
+                     needWake = TRUE;
+                     break;
                 case 0x0806: /* ARP is not important to hold wake lock */
-                    needWake = (ar->arNetworkType==AP_NETWORK);
-                    break;
-                default:
-                    break;
-                } 
-            } else if ( !IEEE80211_IS_BROADCAST(datap->dstMac) ) {
-                if (A_NETBUF_LEN(skb)>=14+20 ) {
-					/* check if it is mDNS packets */
-                    A_UINT8 *dstIpAddr = (A_UINT8*)(A_NETBUF_DATA(skb)+14+20-4);                    
-                    struct net_device *ndev = ar->arNetDev;
-                    needWake = ((dstIpAddr[3] & 0xf8) == 0xf8) &&
-                                (ar->arNetworkType==AP_NETWORK || 
-                                (ndev->flags & IFF_ALLMULTI || ndev->flags & IFF_MULTICAST));
-                }
-            } else if (ar->arNetworkType==AP_NETWORK) {
-                switch (A_BE2CPU16(datap->typeOrLen)) {
-                case 0x0800: /* IP */
-                    if (A_NETBUF_LEN(skb)>=14+20+4) {
-                        A_UINT16 dstPort = *(A_UINT16*)(A_NETBUF_DATA(skb)+14+20+2);
-                        dstPort = A_BE2CPU16(dstPort);
-                        needWake = (dstPort == 0x43); /* dhcp request */
-                    }
-                    break;
-                case 0x0806: 
-                    needWake = TRUE;
                 default:
                     break;
                 }
@@ -661,9 +490,7 @@ void android_ar6k_check_wow_status(AR_SOFTC_T *ar, struct sk_buff *skb, A_BOOL i
         }
         if (needWake) {
             /* keep host wake up if there is any event and packate comming in*/
-#ifdef CONFIG_HAS_WAKELOCK
             wake_lock_timeout(&ar6k_wow_wake_lock, 3*HZ);
-#endif
             if (wowledon) {
                 char buf[32];
                 int len = sprintf(buf, "on");

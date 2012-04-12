@@ -745,6 +745,42 @@ A_STATUS DevGMboxSetTargetInterrupt(AR6K_DEVICE *pDev, int Signal, int AckTimeou
     
 }
 
+/* NCHENG */
+A_STATUS Mini_DevSetupGMbox(AR6K_DEVICE *pDev)
+{
+    A_STATUS    status = A_OK;
+    A_UINT8     muxControl[4];
+    
+    do {
+        
+       
+            /* write to mailbox look ahead mux control register, we want the
+             * GMBOX lookaheads to appear on lookaheads 2 and 3 
+             * the register is 1-byte wide so we need to hit it 4 times to align the operation 
+             * to 4-bytes */            
+        muxControl[0] = GMBOX_LA_MUX_OVERRIDE_2_3;
+        muxControl[1] = GMBOX_LA_MUX_OVERRIDE_2_3;
+        muxControl[2] = GMBOX_LA_MUX_OVERRIDE_2_3;
+        muxControl[3] = GMBOX_LA_MUX_OVERRIDE_2_3;
+                
+        status = HIFReadWrite(pDev->HIFDevice,
+                              GMBOX_LOOKAHEAD_MUX_REG,
+                              muxControl,
+                              sizeof(muxControl),
+                              HIF_WR_SYNC_BYTE_FIX,  /* hit this register 4 times */
+                              NULL);
+        
+        if (A_FAILED(status)) {
+            printk("Mini_DevSetupGMbox failed!\n");
+            break;    
+        }
+        
+    } while (FALSE);
+    
+    return status;
+}
+/* NCHENG */
+
 #endif  /*ATH_AR6K_ENABLE_GMBOX */
 
 

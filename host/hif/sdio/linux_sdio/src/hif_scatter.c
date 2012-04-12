@@ -284,7 +284,7 @@ A_STATUS SetupHIFScatterSupport(HIF_DEVICE *device, HIF_DEVICE_SCATTER_SUPPORT_I
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 39))
         if (device->func->card->host->max_hw_segs < MAX_SCATTER_ENTRIES_PER_REQ) {
 #else
-        if (device->func->card->host->max_segs < MAX_SCATTER_ENTRIES_PER_REQ) {
+	if (device->func->card->host->max_segs < MAX_SCATTER_ENTRIES_PER_REQ) {
 #endif
             AR_DEBUG_PRINTF(ATH_DEBUG_ERR,("HIF-SCATTER : host only supports scatter of : %d entries, need: %d \n",
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 39))

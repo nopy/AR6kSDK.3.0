@@ -538,9 +538,7 @@ A_BOOL HTCGetEndpointStatistics(HTC_HANDLE               HTCHandle,
     }
 
     A_ASSERT(Endpoint < ENDPOINT_MAX);
-    if (!(Endpoint < ENDPOINT_MAX)) {
-        return FALSE;  /* in case panic_on_assert==0 */
-    }
+
         /* lock out TX and RX while we sample and/or clear */
     LOCK_HTC_TX(target);
     LOCK_HTC_RX(target);

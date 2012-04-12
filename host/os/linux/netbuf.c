@@ -16,6 +16,8 @@
 /* */
 /* Author(s): ="Atheros" */
 /*------------------------------------------------------------------------------ */
+#include <linux/kernel.h>
+#include <linux/skbuff.h>
 #include <a_config.h>
 #include "athdefs.h"
 #include "a_types.h"
@@ -54,43 +56,26 @@ void a_netbuf_queue_init(A_NETBUF_QUEUE_T *q)
     skb_queue_head_init((struct sk_buff_head *) q);
 }
 
-#ifdef AR6K_ALLOC_DEBUG
-void *
-a_netbuf_alloc(int size, const char *func, int lineno)
-#else
 void *
 a_netbuf_alloc(int size)
-#endif
 {
     struct sk_buff *skb;
     size += 2 * (A_GET_CACHE_LINE_BYTES()); /* add some cacheline space at front and back of buffer */
     skb = dev_alloc_skb(AR6000_DATA_OFFSET + sizeof(HTC_PACKET) + size);
-    if (skb) {
-        skb_reserve(skb, AR6000_DATA_OFFSET + sizeof(HTC_PACKET) + A_GET_CACHE_LINE_BYTES());    
-#ifdef AR6K_ALLOC_DEBUG
-        __a_meminfo_add(skb, size, func, lineno);
-#endif
-    }
+    skb_reserve(skb, AR6000_DATA_OFFSET + sizeof(HTC_PACKET) + A_GET_CACHE_LINE_BYTES());    
     return ((void *)skb);
 }
 
 /*
  * Allocate an SKB w.o. any encapsulation requirement.
  */
-#ifdef AR6K_ALLOC_DEBUG
-void *
-a_netbuf_alloc_raw(int size, const char *func, int lineno)
-#else
 void *
 a_netbuf_alloc_raw(int size)
-#endif
 {
     struct sk_buff *skb;
 
     skb = dev_alloc_skb(size);
-#ifdef AR6K_ALLOC_DEBUG
-    __a_meminfo_add(skb, size, func, lineno);
-#endif
+
     return ((void *)skb);
 }
 
@@ -98,9 +83,7 @@ void
 a_netbuf_free(void *bufPtr)
 {
     struct sk_buff *skb = (struct sk_buff *)bufPtr;
-#ifdef AR6K_ALLOC_DEBUG
-    a_meminfo_del(bufPtr);
-#endif
+
     dev_kfree_skb(skb);
 }
 

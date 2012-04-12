@@ -164,7 +164,7 @@ struct ieee80211req_wpaie {
     u_int8_t    rsn_ie[IEEE80211_MAX_IE];
 };
 
-#ifndef IW_ENCODE_ALG_PMK
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,27)
 #define IW_ENCODE_ALG_PMK       4
 #endif
 

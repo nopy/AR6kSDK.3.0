@@ -74,7 +74,6 @@ struct wmi_t {
     CRYPTO_TYPE                     wmi_grp_crypto_type;
     A_BOOL                          wmi_is_wmm_enabled;
     A_UINT8                         wmi_ht_allowed[A_NUM_BANDS];
-    A_UINT8                         wmi_traffic_class;
 };
 
 #define LOCK_WMI(w)     A_MUTEX_LOCK(&(w)->wmi_lock);

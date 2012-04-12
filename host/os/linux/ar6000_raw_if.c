@@ -42,9 +42,6 @@ ar6000_htc_raw_read_cb(void *Context, HTC_PACKET *pPacket)
 
     streamID = arEndpoint2RawStreamID(ar,pPacket->Endpoint);
     A_ASSERT(streamID != HTC_RAW_STREAM_NOT_MAPPED);
-    if(streamID == HTC_RAW_STREAM_NOT_MAPPED) {
-        return; /* in case panic_on_assert==0 */
-    }
     
 #ifdef CF
    if (down_trylock(&arRaw->raw_htc_read_sem[streamID])) {
@@ -89,9 +86,7 @@ ar6000_htc_raw_write_cb(void *Context, HTC_PACKET *pPacket)
 
     streamID = arEndpoint2RawStreamID(ar,pPacket->Endpoint);
     A_ASSERT(streamID != HTC_RAW_STREAM_NOT_MAPPED);
-    if(streamID == HTC_RAW_STREAM_NOT_MAPPED) {
-        return; /* in case panic_on_assert==0 */
-    }
+    
 #ifdef CF
     if (down_trylock(&arRaw->raw_htc_write_sem[streamID])) {
 #else
@@ -203,8 +198,8 @@ int ar6000_htc_raw_open(AR_SOFTC_T *ar)
         init_MUTEX(&arRaw->raw_htc_read_sem[streamID]);
         init_MUTEX(&arRaw->raw_htc_write_sem[streamID]);
 #else
-        sema_init(&arRaw->raw_htc_read_sem[streamID],1);
-        sema_init(&arRaw->raw_htc_write_sem[streamID],1);
+	sema_init(&arRaw->raw_htc_read_sem[streamID],1);
+	sema_init(&arRaw->raw_htc_write_sem[streamID],1);
 #endif
         init_waitqueue_head(&arRaw->raw_htc_read_queue[streamID]);
         init_waitqueue_head(&arRaw->raw_htc_write_queue[streamID]);

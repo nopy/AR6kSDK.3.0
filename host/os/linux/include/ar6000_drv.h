@@ -20,23 +20,38 @@
 #ifndef _AR6000_H_
 #define _AR6000_H_
 
-//#include <linux/autoconf.h>
+#include <linux/version.h>
+
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,17)
+#include <linux/config.h>
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33)
+#include <linux/autoconf.h>
+#else
+#include <generated/autoconf.h>
+#endif
 #include <linux/init.h>
+#include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/spinlock.h>
+#include <linux/skbuff.h>
 #include <linux/if_ether.h>
+#include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <net/iw_handler.h>
 #include <linux/if_arp.h>
 #include <linux/ip.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,26)
+#include <asm/semaphore.h>
+#else
+#include <linux/semaphore.h>
+#endif
 #include <linux/wireless.h>
 #ifdef ATH6K_CONFIG_CFG80211
 #include <net/cfg80211.h>
 #endif /* ATH6K_CONFIG_CFG80211 */
 #include <linux/module.h>
 #include <asm/io.h>
-#include <linux/irqreturn.h>
-#include <linux/interrupt.h>
 
 #include <a_config.h>
 #include <athdefs.h>
@@ -161,9 +176,7 @@ extern "C" {
 #define AR6000_HB_CHALLENGE_RESP_MISS_THRES_DEFAULT  1
 #define A_DISCONNECT_TIMER_INTERVAL       10 * 1000
 #define A_DEFAULT_LISTEN_INTERVAL         100
-#define A_DEFAULT_BMISS_TIME              1500
-#define A_MAX_WOW_LISTEN_INTERVAL         300
-#define A_MAX_WOW_BMISS_TIME              4500
+#define A_MAX_WOW_LISTEN_INTERVAL         1000
 
 enum {
     DRV_HB_CHALLENGE = 0,
@@ -244,11 +257,11 @@ typedef enum _AR6K_BIN_FILE {
 #define ENABLEUARTPRINT_DEFAULT    0
 #endif /* ENABLEARTPRINT_SET */
 
-#ifdef ATH6KL_CONFIG_HIF_VIRTUAL_SCATTER
+#ifdef ATH6K_CONFIG_HIF_VIRTUAL_SCATTER
 #define NOHIFSCATTERSUPPORT_DEFAULT    1
-#else /* ATH6KL_CONFIG_HIF_VIRTUAL_SCATTER */
+#else /* ATH6K_CONFIG_HIF_VIRTUAL_SCATTER */
 #define NOHIFSCATTERSUPPORT_DEFAULT    0
-#endif /* ATH6KL_CONFIG_HIF_VIRTUAL_SCATTER */
+#endif /* ATH6K_CONFIG_HIF_VIRTUAL_SCATTER */
 
 #ifdef AR600x_BT_AR3001
 #define AR3KHCIBAUD_DEFAULT        3000000
@@ -496,8 +509,6 @@ typedef struct ar6_softc {
     A_UINT16                arBssChannel;
     A_UINT16                arListenIntervalB;
     A_UINT16                arListenIntervalT;
-    A_UINT16                arBmissTimeB;
-    A_UINT16                arBmissTimeT;
     struct ar6000_version   arVersion;
     A_UINT32                arTargetType;
     A_INT8                  arRssi;
@@ -533,6 +544,9 @@ typedef struct ar6_softc {
     A_UINT32                arCookieCount;
     A_UINT32                arRateMask;
     A_UINT8                 arSkipScan;
+/* NCHENG */
+    A_UINT8                 arSkipAllScanReq;
+/* NCHENG */
     A_UINT16                arBeaconInterval;
     A_BOOL                  arConnectPending;
     A_BOOL                  arWmmEnabled;
@@ -591,9 +605,6 @@ typedef struct ar6_softc {
     A_BOOL                  bIsDestroyProgress; /* flag to indicate ar6k destroy is in progress */
     A_TIMER                 disconnect_timer;
     A_UINT8		    rxMetaVersion;
-#ifdef WAPI_ENABLE
-    A_UINT8                 arWapiEnable;
-#endif
 	WMI_BTCOEX_CONFIG_EVENT arBtcoexConfig;
 	WMI_BTCOEX_STATS_EVENT  arBtcoexStats;
     A_INT32                 (*exitCallback)(void *config);  /* generic callback at AR6K exit */
@@ -605,7 +616,6 @@ typedef struct ar6_softc {
 #endif /* ATH6K_CONFIG_CFG80211 */
     A_UINT16                arWlanPowerState;
     A_BOOL                  arWlanOff;
-    A_BOOL                  arPlatPowerOff;
 #ifdef CONFIG_PM
     A_UINT16                arWowState;
     A_BOOL                  arBTOff;
@@ -623,8 +633,6 @@ typedef struct ar6_softc {
 #ifdef CONFIG_AP_VIRTUAL_ADAPTER_SUPPORT
     void                    *arApDev;
 #endif
-    A_BOOL                  arDoConnectOnResume;
-    A_BOOL                  arResumeDone;
 } AR_SOFTC_T;
 
 #ifdef CONFIG_AP_VIRTUAL_ADAPTER_SUPPORT
@@ -659,25 +667,6 @@ static inline void *ar6k_priv(struct net_device *dev)
 #define ar6k_priv   netdev_priv
 #endif /* CONFIG_AP_VIRTUAL_ADAPTER_SUPPORT */
 #endif /* ATH6K_CONFIG_CFG80211 */
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,34)
-#define SET_HCI_BUS_TYPE(pHciDev, __bus, __type) do { \
-    (pHciDev)->type = (__bus); \
-} while(0)
-#else
-#define SET_HCI_BUS_TYPE(pHciDev, __bus, __type) do { \
-    (pHciDev)->bus = (__bus); \
-    (pHciDev)->dev_type = (__type); \
-} while(0)
-#endif
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,20)
-#define GET_INODE_FROM_FILEP(filp) \
-    (filp)->f_path.dentry->d_inode
-#else
-#define GET_INODE_FROM_FILEP(filp) \
-    (filp)->f_dentry->d_inode
-#endif
 
 #define arAc2EndpointID(ar,ac)          (ar)->arAc2EpMapping[(ac)]
 #define arSetAc2EndpointIDMap(ar,ac,ep)  \

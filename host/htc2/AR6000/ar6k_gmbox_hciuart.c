@@ -110,6 +110,8 @@ static A_STATUS InitTxCreditState(GMBOX_PROTO_HCI_UART *pProt)
     A_BOOL      gotCredits = FALSE;
 
     pProt->CreditsConsumed = 0;
+	pProt->CreditsAvailable = 0;
+	pProt->CreditsMax = 0;
     
     do {    
         
